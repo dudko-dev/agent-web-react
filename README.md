@@ -82,7 +82,7 @@ export function Assistant() {
   return (
     <AgentProvider
       config={{
-        model: { providerType: 'google', model: 'gemini-flash-latest', credentialRef: 'google' },
+        model: { providerType: 'google', model: 'gemini-3.5-flash', credentialRef: 'google' },
         credentials: credentials.store,
         tools,
         describeState: () => serializeMyState(), // optional grounding
@@ -122,7 +122,7 @@ function Custom() {
   const agent = useAgent({
     // In a bundler, pass a model you built (see “Models in a bundler”); a
     // provider spec like this one only resolves where dynamic imports do.
-    model: { providerType: 'openai', model: 'gpt-5-mini', credentialRef: 'openai' },
+    model: { providerType: 'openai', model: 'gpt-5.4-mini', credentialRef: 'openai' },
     credentials,
     tools,
   })
@@ -234,7 +234,7 @@ function CloudAgent() {
 
   useEffect(() => {
     credentials.store.getApiKey('google').then((key) => {
-      setModel(key ? createGoogleGenerativeAI({ apiKey: key })('gemini-flash-latest') : undefined)
+      setModel(key ? createGoogleGenerativeAI({ apiKey: key })('gemini-3.5-flash') : undefined)
     })
   }, [credentials.store, credentials.version])
 

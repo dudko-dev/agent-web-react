@@ -35,10 +35,16 @@ export const Settings = ({
           value={selected.id}
           onChange={(e) => onSelect(e.target.value)}
         >
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
+          {[...new Set(models.map((m) => m.group))].map((group) => (
+            <optgroup key={group} label={group}>
+              {models
+                .filter((m) => m.group === group)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+            </optgroup>
           ))}
         </select>
       </label>

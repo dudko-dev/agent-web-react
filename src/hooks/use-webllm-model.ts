@@ -1,5 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
-import { createWebLLMModel, isWebGPUAvailable, type WebLLMModelOptions } from '@dudko.dev/agent-web'
+import {
+  createWebLLMModel,
+  isWebGPUAvailable,
+  preloadWebLLMModel,
+  type WebLLMModelOptions,
+} from '@dudko.dev/agent-web'
 import { errMessage } from '../util.js'
 
 /** The AI SDK `LanguageModel` a WebLLM build produces (resolved via agent-web). */
@@ -52,15 +57,12 @@ export interface UseWebLLMModelReturn {
   ready: boolean
 }
 
-/** A model that can eagerly initialize its engine with progress (WebLLM builds do). */
-type Warmable = { createSessionWithProgress?: () => Promise<unknown> }
-
 /**
  * Load a local WebGPU model with WebLLM and track its download progress.
  * Nothing downloads until you call `load()` (models are large), so you can
- * gate it behind a user action. `load()` eagerly initializes the engine, so
- * `ready` means "ready to chat" and progress fills during the load rather than
- * silently on the first message.
+ * gate it behind a user action. `load()` eagerly initializes the engine (via
+ * the core's `preloadWebLLMModel`), so `ready` means "ready to chat" and
+ * progress fills during the load rather than silently on the first message.
  *
  * ```tsx
  * import { webLLM } from '@browser-ai/web-llm' // your app's optional peer
@@ -96,19 +98,21 @@ export const useWebLLMModel = (
       const { create = createWebLLMModel, ...modelOptions } = optionsRef.current ?? {}
       const built = await create(modelId, {
         ...modelOptions,
+        // Drive preload here (below) so download progress is reported the same
+        // way whether `create` is the core's `createWebLLMModel` or an injected
+        // factory (e.g. a statically-imported `webLLM`, needed under bundlers).
+        preload: false,
         initProgressCallback: (report) => {
           setProgress(report.progress)
           setText(report.text)
           modelOptions.initProgressCallback?.(report)
         },
       })
-      // Force the weight download / engine init now. WebLLM builds are lazy —
-      // without this the ~GB download would only start on the first `run()`,
-      // long after we've told the UI the model is "ready".
-      const warmable = built as Warmable
-      if (typeof warmable.createSessionWithProgress === 'function') {
-        await warmable.createSessionWithProgress()
-      }
+      // Download the weights + init the engine now via the core's helper (a
+      // 1-token warm-up). WebLLM builds are otherwise lazy — the ~GB download
+      // would only start on the first `run()`, long after we told the UI the
+      // model is "ready". Fast + idempotent once the weights are cached.
+      await preloadWebLLMModel(built)
       setModel(built)
       return built
     } catch (err) {

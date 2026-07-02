@@ -14,7 +14,7 @@ short (a few words). When asked for a list or a plan, create one note per item.
 Use colors meaningfully — e.g. red for urgent, green for done.`
 
 export const App = () => {
-  const [modelId, setModelId] = useState('google')
+  const [modelId, setModelId] = useState('google-flash')
   const model = MODELS.find((m) => m.id === modelId) ?? MODELS[0]
   const local = isLocal(model)
 
@@ -61,6 +61,9 @@ export const App = () => {
       describeState: board.describeState,
       systemPrompt: SYSTEM_PROMPT,
       maxIterations: 6,
+      // Stream the agent's internal phases (planning, tool dispatch, raw model
+      // output) to the browser console — handy for poking at the demo.
+      logLevel: 'debug',
     }),
     [resolvedModel, credentials.store, board.tools, board.describeState],
   )

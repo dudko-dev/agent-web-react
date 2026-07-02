@@ -104,12 +104,12 @@
     "node": ">=18"
   },
   "peerDependencies": {
-    "@dudko.dev/agent-web": ">=0.0.4",
+    "@dudko.dev/agent-web": ">=0.0.6",
     "react": ">=18",
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@dudko.dev/agent-web": "^0.0.4",
+    "@dudko.dev/agent-web": "^0.0.6",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
