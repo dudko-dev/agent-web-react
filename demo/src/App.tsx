@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { BrowserAgentConfig, ModelInput } from '@dudko.dev/agent-web'
 import { AgentChat, useAgent, useCredentials, useWebLLMModel } from '@dudko.dev/agent-web-react'
+import type { LanguageModel } from 'ai'
 import { NotesBoard } from './components/NotesBoard'
 import { Settings } from './components/Settings'
 import { isLocal, MODELS } from './models'
 import { useNotesBoard } from './notes'
+import { buildCloudModel, createLocalModel } from './providers'
 
 const SYSTEM_PROMPT = `You manage a sticky-notes board through the provided tools.
 Add, update, remove and list notes to satisfy the user's request. Keep each note
@@ -18,29 +20,55 @@ export const App = () => {
 
   const credentials = useCredentials()
   const board = useNotesBoard()
-  const webllm = useWebLLMModel(model.model)
+  // Inject a statically-imported WebLLM factory so the weights actually bundle
+  // (the core's dynamic import gets stubbed to an empty module by Vite).
+  const webllm = useWebLLMModel(model.model, { create: createLocalModel })
 
-  // Cloud → a resolvable ProviderModelSpec; local → the loaded LanguageModel
-  // (undefined until the user downloads it, which keeps the agent idle).
-  const modelInput: ModelInput | undefined = local
-    ? webllm.model
-    : { providerType: model.providerType, model: model.model, credentialRef: model.credentialRef! }
+  // Cloud models are built in-app from the vault-stored key. We pass the agent
+  // a direct LanguageModel rather than a ProviderModelSpec, because the core's
+  // dynamic `import('@ai-sdk/…')` can't be resolved from a browser bundle (see
+  // providers.ts). Rebuilds whenever the key or selected model changes.
+  const [cloudModel, setCloudModel] = useState<LanguageModel | undefined>(undefined)
+  useEffect(() => {
+    if (local) {
+      setCloudModel(undefined)
+      return
+    }
+    let active = true
+    credentials.store
+      .getApiKey(model.credentialRef!)
+      .then((key) => {
+        if (active) setCloudModel(key ? buildCloudModel(model, key) : undefined)
+      })
+      .catch(() => {
+        if (active) setCloudModel(undefined)
+      })
+    return () => {
+      active = false
+    }
+  }, [local, model, credentials.store, credentials.version])
+
+  // Local → the loaded WebGPU model; cloud → the built provider model. Either is
+  // undefined until ready, which keeps the agent idle (useAgent won't build
+  // without a model) rather than constructing a broken one.
+  const resolvedModel = local ? webllm.model : cloudModel
 
   const config = useMemo<BrowserAgentConfig>(
     () => ({
-      model: modelInput as ModelInput,
+      model: resolvedModel as ModelInput,
       credentials: credentials.store,
       tools: board.tools,
       describeState: board.describeState,
       systemPrompt: SYSTEM_PROMPT,
       maxIterations: 6,
     }),
-    [modelInput, credentials.store, board.tools, board.describeState],
+    [resolvedModel, credentials.store, board.tools, board.describeState],
   )
 
   const agent = useAgent(config, {
-    deps: [modelId, local && webllm.ready],
-    autoStart: local ? webllm.ready : true,
+    // Rebuild when the resolved model changes identity: model loaded, key
+    // added/replaced, or provider switched.
+    deps: [modelId, resolvedModel],
   })
 
   return (
@@ -97,7 +125,11 @@ export const App = () => {
       <footer className="app__footer">
         Keys are stored <strong>encrypted at rest</strong> (WebCrypto + IndexedDB) and never leave
         your browser. Built with{' '}
-        <a href="https://www.npmjs.com/package/@dudko.dev/agent-web" target="_blank" rel="noreferrer">
+        <a
+          href="https://www.npmjs.com/package/@dudko.dev/agent-web"
+          target="_blank"
+          rel="noreferrer"
+        >
           @dudko.dev/agent-web
         </a>
         .

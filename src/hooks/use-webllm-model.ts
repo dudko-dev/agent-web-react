@@ -5,6 +5,34 @@ import { errMessage } from '../util.js'
 /** The AI SDK `LanguageModel` a WebLLM build produces (resolved via agent-web). */
 type WebLLMModel = Awaited<ReturnType<typeof createWebLLMModel>>
 
+/**
+ * Builds a WebLLM-backed `LanguageModel`. Defaults to the core's
+ * {@link createWebLLMModel}; override it via {@link UseWebLLMModelOptions.create}.
+ */
+export type WebLLMModelFactory = (
+  modelId: string,
+  options?: WebLLMModelOptions,
+) => Promise<WebLLMModel>
+
+export interface UseWebLLMModelOptions extends WebLLMModelOptions {
+  /**
+   * Override how the model is built. **Bundled browser apps (Vite, Next, …)
+   * usually need this**: the core builds WebLLM via `await import('@browser-ai/
+   * web-llm')`, and a bundler frequently stubs that dynamic import to an empty
+   * module — the failure surfaces as `webLLM is not a function`. Pass a factory
+   * that imports `webLLM` statically so the bundler includes it:
+   *
+   * ```ts
+   * import { webLLM } from '@browser-ai/web-llm'
+   * const create = (id, opts) => Promise.resolve(webLLM(id, opts))
+   * const local = useWebLLMModel('Qwen2.5-1.5B-Instruct-q4f16_1-MLC', { create })
+   * ```
+   *
+   * Defaults to `createWebLLMModel` from `@dudko.dev/agent-web`.
+   */
+  create?: WebLLMModelFactory
+}
+
 export interface UseWebLLMModelReturn {
   /** The built model once loaded — pass to `createAgent({ model })`. */
   model: WebLLMModel | undefined
@@ -24,13 +52,20 @@ export interface UseWebLLMModelReturn {
   ready: boolean
 }
 
+/** A model that can eagerly initialize its engine with progress (WebLLM builds do). */
+type Warmable = { createSessionWithProgress?: () => Promise<unknown> }
+
 /**
  * Load a local WebGPU model with WebLLM and track its download progress.
  * Nothing downloads until you call `load()` (models are large), so you can
- * gate it behind a user action.
+ * gate it behind a user action. `load()` eagerly initializes the engine, so
+ * `ready` means "ready to chat" and progress fills during the load rather than
+ * silently on the first message.
  *
  * ```tsx
- * const local = useWebLLMModel('Llama-3.2-3B-Instruct-q4f16_1-MLC')
+ * import { webLLM } from '@browser-ai/web-llm' // your app's optional peer
+ * const create = (id: string, opts?: WebLLMModelOptions) => Promise.resolve(webLLM(id, opts))
+ * const local = useWebLLMModel('Qwen2.5-1.5B-Instruct-q4f16_1-MLC', { create })
  * // <button disabled={!local.supported || local.loading} onClick={local.load}>Load</button>
  * // {local.loading && <ModelLoadBar load={{ progress: local.progress, text: local.text }} />}
  * // local.ready && <AgentProvider config={{ model: local.model! }}>…
@@ -38,7 +73,7 @@ export interface UseWebLLMModelReturn {
  */
 export const useWebLLMModel = (
   modelId: string,
-  options?: WebLLMModelOptions,
+  options?: UseWebLLMModelOptions,
 ): UseWebLLMModelReturn => {
   const [model, setModel] = useState<WebLLMModel | undefined>(undefined)
   const [loading, setLoading] = useState(false)
@@ -55,15 +90,25 @@ export const useWebLLMModel = (
     }
     setLoading(true)
     setError(undefined)
+    setProgress(0)
+    setText('')
     try {
-      const built = await createWebLLMModel(modelId, {
-        ...optionsRef.current,
+      const { create = createWebLLMModel, ...modelOptions } = optionsRef.current ?? {}
+      const built = await create(modelId, {
+        ...modelOptions,
         initProgressCallback: (report) => {
           setProgress(report.progress)
           setText(report.text)
-          optionsRef.current?.initProgressCallback?.(report)
+          modelOptions.initProgressCallback?.(report)
         },
       })
+      // Force the weight download / engine init now. WebLLM builds are lazy —
+      // without this the ~GB download would only start on the first `run()`,
+      // long after we've told the UI the model is "ready".
+      const warmable = built as Warmable
+      if (typeof warmable.createSessionWithProgress === 'function') {
+        await warmable.createSessionWithProgress()
+      }
       setModel(built)
       return built
     } catch (err) {

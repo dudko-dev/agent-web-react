@@ -19,18 +19,33 @@ export interface ModelOption {
  * The models the demo can drive. Google (Gemini) and local WebLLM are the most
  * reliable from a browser origin; OpenAI/Anthropic may hit CORS unless you put
  * a proxy in front (see the agent-web providers docs).
+ *
+ * Cloud models use Google's / OpenAI's rolling `*-latest` aliases where they
+ * exist so this list doesn't drift out of date — the demo builds each provider
+ * model directly (see `providers.ts`).
  */
 export const MODELS: ModelOption[] = [
   {
     id: 'google',
-    label: 'Google · Gemini 2.0 Flash',
+    label: 'Google · Gemini Flash (latest)',
     providerType: 'google',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-flash-latest',
     credentialRef: 'google',
     keyLabel: 'Google AI Studio key',
     keyPlaceholder: 'AIza…',
     keyUrl: 'https://aistudio.google.com/apikey',
-    note: 'Reliable direct BYOK from the browser — recommended for this demo.',
+    note: 'Reliable direct BYOK from the browser — recommended for this demo. Tracks the current Gemini Flash via the rolling “latest” alias.',
+  },
+  {
+    id: 'google-lite',
+    label: 'Google · Gemini Flash-Lite (latest)',
+    providerType: 'google',
+    model: 'gemini-flash-lite-latest',
+    credentialRef: 'google',
+    keyLabel: 'Google AI Studio key',
+    keyPlaceholder: 'AIza…',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    note: 'Cheapest, fastest Gemini tier — great for high-throughput tool use. Uses the same Google key as above.',
   },
   {
     id: 'anthropic',
@@ -41,25 +56,32 @@ export const MODELS: ModelOption[] = [
     keyLabel: 'Anthropic API key',
     keyPlaceholder: 'sk-ant-…',
     keyUrl: 'https://console.anthropic.com/settings/keys',
-    note: 'Works directly (the required browser header is injected for you).',
+    note: 'Works directly from the browser (the required opt-in header is injected for you).',
   },
   {
     id: 'openai',
-    label: 'OpenAI · GPT-4o mini',
+    label: 'OpenAI · GPT-5 mini',
     providerType: 'openai',
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-mini',
     credentialRef: 'openai',
     keyLabel: 'OpenAI API key',
     keyPlaceholder: 'sk-…',
     keyUrl: 'https://platform.openai.com/api-keys',
-    note: 'OpenAI usually blocks direct browser calls (CORS) — expect to need a proxy.',
+    note: 'OpenAI blocks direct browser calls (CORS) — expect to need a proxy.',
   },
   {
-    id: 'local',
+    id: 'local-qwen',
+    label: 'Local · Qwen2.5 1.5B (WebGPU)',
+    providerType: 'web-llm',
+    model: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
+    note: 'Runs entirely on your GPU via WebLLM. No key, fully private — a ~1 GB one-time download; needs WebGPU (Chrome/Edge).',
+  },
+  {
+    id: 'local-llama',
     label: 'Local · Llama 3.2 3B (WebGPU)',
     providerType: 'web-llm',
     model: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',
-    note: 'Runs entirely on your GPU via WebLLM. No key, fully private — but a ~2 GB one-time download and needs WebGPU (Chrome/Edge).',
+    note: 'A larger, stronger local model via WebLLM — a ~2 GB one-time download; needs WebGPU (Chrome/Edge).',
   },
 ]
 

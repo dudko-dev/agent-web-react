@@ -4,7 +4,11 @@ export type { UseAgentOptions, UseAgentReturn } from './hooks/use-agent.js'
 export { useCredentials } from './hooks/use-credentials.js'
 export type { UseCredentialsReturn } from './hooks/use-credentials.js'
 export { useWebLLMModel } from './hooks/use-webllm-model.js'
-export type { UseWebLLMModelReturn } from './hooks/use-webllm-model.js'
+export type {
+  UseWebLLMModelReturn,
+  UseWebLLMModelOptions,
+  WebLLMModelFactory,
+} from './hooks/use-webllm-model.js'
 
 // ── Context ──────────────────────────────────────────────────────────────────
 export { AgentProvider, useAgentContext, useOptionalAgentContext } from './context.js'

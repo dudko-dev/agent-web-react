@@ -63,7 +63,7 @@ export const Settings = ({
               onClick={() => void webllm.load()}
               disabled={!webllm.supported}
             >
-              Download &amp; load model (~2 GB)
+              Download &amp; load model
             </button>
           )}
         </div>

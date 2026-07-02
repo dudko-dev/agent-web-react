@@ -82,7 +82,7 @@ export function Assistant() {
   return (
     <AgentProvider
       config={{
-        model: { providerType: 'google', model: 'gemini-2.0-flash', credentialRef: 'google' },
+        model: { providerType: 'google', model: 'gemini-flash-latest', credentialRef: 'google' },
         credentials: credentials.store,
         tools,
         describeState: () => serializeMyState(), // optional grounding
@@ -93,6 +93,14 @@ export function Assistant() {
   )
 }
 ```
+
+> **Using a bundler (Vite, Next, CRA)?** A provider **spec** like the one above
+> asks the core to `import('@ai-sdk/google')` at runtime — but browser bundlers
+> can't resolve that bare, `@vite-ignore`d import, so it fails with
+> _“Provider package … is not installed”_ (and WebLLM fails with _“webLLM is not
+> a function”_). Build the model yourself and pass it **directly** instead — see
+> [Models in a bundler](#models-in-a-bundler-vite-next-cra). It's a few extra
+> lines and works in every bundler.
 
 Store the user's key once (encrypted at rest), e.g. from a settings form:
 
@@ -112,7 +120,9 @@ import { useAgent } from '@dudko.dev/agent-web-react'
 
 function Custom() {
   const agent = useAgent({
-    model: { providerType: 'openai', model: 'gpt-4o-mini', credentialRef: 'openai' },
+    // In a bundler, pass a model you built (see “Models in a bundler”); a
+    // provider spec like this one only resolves where dynamic imports do.
+    model: { providerType: 'openai', model: 'gpt-5-mini', credentialRef: 'openai' },
     credentials,
     tools,
   })
@@ -168,12 +178,16 @@ switch), `onEvent` (tap the raw event stream), `autoStart`, `maxEvents`.
 
 ```tsx
 import { useAgent, useWebLLMModel, ModelLoadBar } from '@dudko.dev/agent-web-react'
+import { webLLM } from '@browser-ai/web-llm' // your app's optional peer
+
+// Build WebLLM in your own code so the bundler includes it (see note below).
+const createLocalModel = (id: string, opts?: object) => Promise.resolve(webLLM(id, opts as never))
 
 function LocalAgent() {
-  const local = useWebLLMModel('Llama-3.2-3B-Instruct-q4f16_1-MLC')
+  const local = useWebLLMModel('Qwen2.5-1.5B-Instruct-q4f16_1-MLC', { create: createLocalModel })
   const agent = useAgent(
     { model: local.model!, tools },
-    { deps: [local.ready], autoStart: local.ready }, // build once the model is loaded
+    { deps: [local.model] }, // build once the model is loaded
   )
 
   if (!local.ready) {
@@ -188,6 +202,55 @@ function LocalAgent() {
   return <AgentChat controller={agent} />
 }
 ```
+
+> `load()` eagerly downloads the weights (so the progress bar fills during load,
+> not silently on the first message) and `ready` flips only once the model can
+> actually answer. The `create` option is what makes it work under a bundler —
+> see below.
+
+## Models in a bundler (Vite, Next, CRA)
+
+The core builds cloud providers with `import('@ai-sdk/<provider>')` and WebLLM
+with `import('@browser-ai/web-llm')`. Those are **bare, `@vite-ignore`d dynamic
+imports** — great for Node/SSR/import-map setups, but a browser bundler either
+leaves them unresolvable at runtime (cloud → _“Provider package … is not
+installed”_) or stubs them to an empty module (WebLLM → _“webLLM is not a
+function”_).
+
+The fix is the same for both: **build the model in your own code** (a static
+import your bundler can see) and hand the agent a direct `LanguageModel`.
+
+**Cloud** — construct the provider from the vault-stored key:
+
+```tsx
+import { useEffect, useState } from 'react'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import type { LanguageModel } from 'ai'
+import { useAgent, useCredentials } from '@dudko.dev/agent-web-react'
+
+function CloudAgent() {
+  const credentials = useCredentials()
+  const [model, setModel] = useState<LanguageModel>()
+
+  useEffect(() => {
+    credentials.store.getApiKey('google').then((key) => {
+      setModel(key ? createGoogleGenerativeAI({ apiKey: key })('gemini-flash-latest') : undefined)
+    })
+  }, [credentials.store, credentials.version])
+
+  const agent = useAgent({ model: model!, credentials: credentials.store, tools }, { deps: [model] })
+  // …render <AgentChat controller={agent} /> once model is set
+}
+```
+
+> Anthropic needs `headers: { 'anthropic-dangerous-direct-browser-access': 'true' }`
+> passed to `createAnthropic({ … })` for direct browser calls.
+
+**Local** — pass a statically-imported `webLLM` factory via `useWebLLMModel`'s
+`create` option (see the WebLLM example above).
+
+The [`demo/`](demo/) app does exactly this — see
+[`demo/src/providers.ts`](demo/src/providers.ts).
 
 ## Components
 
