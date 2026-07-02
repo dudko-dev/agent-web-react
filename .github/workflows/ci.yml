@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  # Lets a maintainer re-run the suite from the Actions tab without pushing.
+  workflow_dispatch:
+
+jobs:
+  library:
+    name: Library
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+  demo:
+    name: Demo
+    runs-on: ubuntu-latest
+    # The demo aliases the library to ../dist, so build the library first.
+    needs: library
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install & build library
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install demo
+        working-directory: demo
+        run: npm ci
+
+      - name: Typecheck demo
+        working-directory: demo
+        run: npm run typecheck
+
+      - name: Build demo
+        working-directory: demo
+        run: npm run build
