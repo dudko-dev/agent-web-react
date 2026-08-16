@@ -32,10 +32,21 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {
+    // `--host 127.0.0.1` is load-bearing, not decoration. Vite's default host
+    // is `localhost`, which Node resolves through DNS — on a GitHub runner that
+    // answers `::1` first, so the server listens on IPv6 while Playwright polls
+    // the IPv4 address below and waits out the full timeout with a healthy
+    // server running. Binding the same literal address both places removes the
+    // resolver from the equation.
     command:
-      'npm --prefix demo run build && npm --prefix demo run preview -- --port 4173 --strictPort',
+      'npm --prefix demo run build && npm --prefix demo run preview -- --host 127.0.0.1 --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173/agent-web-react/',
     reuseExistingServer: !process.env.CI,
+    // Playwright ignores webServer stdout by default, which is why the first CI
+    // failure showed a build log and then silence. Piping it means the next one
+    // shows the server's own banner or its error.
+    stdout: 'pipe',
+    stderr: 'pipe',
     timeout: 180_000,
   },
 })
