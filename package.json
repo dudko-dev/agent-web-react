@@ -38,7 +38,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\"",
     "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning tests/*.test.ts",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
-    "pretest": "npm run build"
+    "pretest": "npm run build",
+    "test:e2e": "playwright test"
   },
   "keywords": [
     "agent",
@@ -111,6 +112,7 @@
   "devDependencies": {
     "@dudko.dev/agent-web": "^0.0.12",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.9.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

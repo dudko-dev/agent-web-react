@@ -342,6 +342,19 @@ from one place.
 > Ship only the **user's own** key to the browser — shared/app keys belong
 > behind a proxy or the gateway.
 
+## Browser tests
+
+`npm run test:e2e` builds the demo and drives it in Chromium: connecting to a
+remote MCP server, the full OAuth redirect round-trip (authorize → come back
+with a code → connected), reuse of the stored tokens after a reload, and the
+error path for an unreachable server. The MCP and authorization servers it
+talks to are started on loopback by [`e2e/servers.ts`](e2e/servers.ts), CORS
+headers included — so the test also pins the deployment requirement that the
+challenge header be exposed.
+
+These cover what unit tests structurally cannot: effect ordering across a real
+render, a real navigation away and back, and IndexedDB.
+
 ## Demo & deployment
 
 The [`demo/`](demo/) app (Vite + React) is deployed to GitHub Pages by
