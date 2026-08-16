@@ -107,7 +107,10 @@ export const App = () => {
   useEffect(() => {
     const next = view === 'mcp' ? '#/mcp' : ''
     if (window.location.hash !== next) {
-      window.history.replaceState(null, '', `${window.location.pathname}${next}`)
+      // Keep the query string: useMcp reads (and clears) the OAuth callback
+      // params from it, and this effect runs while that is still in flight.
+      const { pathname, search } = window.location
+      window.history.replaceState(null, '', `${pathname}${search}${next}`)
     }
   }, [view])
 
@@ -124,6 +127,15 @@ export const App = () => {
   )
 
   const mcpAgent = useAgent(mcpConfig, { deps: [modelId, resolvedModel, mcp.tools] })
+
+  // One model, two agents: stop whichever panel the user just left, so a local
+  // WebGPU engine never has two generations running against it at once.
+  const stopNotes = agent.stop
+  const stopMcp = mcpAgent.stop
+  useEffect(() => {
+    if (view === 'mcp') stopNotes()
+    else stopMcp()
+  }, [view, stopNotes, stopMcp])
 
   return (
     <div className="app">

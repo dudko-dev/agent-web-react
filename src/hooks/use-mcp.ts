@@ -5,6 +5,7 @@ import type {
   ConnectedMcp,
   McpCatalogEntry,
   McpModule,
+  McpOAuthCallback,
   McpServerResult,
 } from '../mcp-types.js'
 
@@ -41,7 +42,8 @@ export interface UseMcpReturn {
   authorizationUrl?: string
   /**
    * Whether the installed core exposes the OAuth API. `undefined` until the
-   * optional subpath has been loaded once (first `connect`, or a callback).
+   * optional subpath has been loaded once — call `checkOAuthSupport()` to
+   * resolve it before offering OAuth in your UI.
    */
   oauthSupported?: boolean
   /** True while an OAuth redirect is being finished on mount. */
@@ -52,17 +54,20 @@ export interface UseMcpReturn {
   authorize: () => void
   /** Drop the stored tokens and dynamic registration for the current server. */
   forgetAuthorization: () => Promise<void>
+  /** Load the optional subpath and report whether it can do OAuth. */
+  checkOAuthSupport: () => Promise<boolean>
 }
 
 const OAUTH_UNSUPPORTED =
   'The installed @dudko.dev/agent-web has no MCP OAuth support. Upgrade the core to a version exporting BrowserOAuthProvider, or use a static Authorization header.'
 
-const STORAGE_KEY = 'agent-web-react:mcp:pending'
+const PENDING_KEY = 'agent-web-react:mcp:pending'
+const OAUTH_KEY = 'agent-web-react:mcp:oauth'
 
-interface PendingConnect {
+interface OAuthRecord {
   url: string
   name?: string
-  redirectUrl?: string
+  redirectUrl: string
   scope?: string
   clientName?: string
 }
@@ -75,7 +80,14 @@ let modulePromise: Promise<McpModule> | undefined
  * core without the OAuth half degrades to a clear message instead of a crash.
  */
 const loadMcp = (): Promise<McpModule> => {
-  modulePromise ??= import('@dudko.dev/agent-web/mcp').then((m) => m as unknown as McpModule)
+  modulePromise ??= import('@dudko.dev/agent-web/mcp')
+    .then((m) => m as unknown as McpModule)
+    .catch((err: unknown) => {
+      // A rejected promise is neither null nor undefined, so ??= would cache
+      // the failure forever — one flaky chunk fetch would kill MCP for the tab.
+      modulePromise = undefined
+      throw err
+    })
   return modulePromise
 }
 
@@ -89,38 +101,94 @@ export const describeMcpResult = (
   return { status: 'error', error: result.error ?? 'Could not connect to the MCP server' }
 }
 
+const OAUTH_PARAMS = ['code', 'state', 'error', 'error_description', 'iss']
+
 /**
- * Remove the OAuth response parameters from a URL, leaving the rest intact.
- * The code is single-use and lands in history, referrers and screenshots —
- * clear it as soon as it has been exchanged.
+ * Read the authorization-code parameters out of a URL **synchronously**.
+ *
+ * The core exports an equivalent, but it lives behind a dynamic import: by the
+ * time that import resolves, React has flushed the rest of the app's effects,
+ * and any one of them may have rewritten `location` (the demo's own view
+ * router did exactly that). The callback has to be captured before the first
+ * await, so this parser is duplicated here on purpose.
+ *
+ * Reads the query string and, for hash-routed apps, the fragment. Returns
+ * undefined when neither a `code` nor an `error` is present.
+ */
+export const readCallbackParams = (href?: string): McpOAuthCallback | undefined => {
+  const target =
+    href ?? (typeof globalThis.location !== 'undefined' ? globalThis.location.href : undefined)
+  if (!target) return undefined
+  let url: URL
+  try {
+    url = new URL(target)
+  } catch {
+    return undefined
+  }
+  const params = new URLSearchParams(url.search)
+  const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash
+  const q = hash.indexOf('?')
+  if (q >= 0) {
+    for (const [k, v] of new URLSearchParams(hash.slice(q + 1))) {
+      if (!params.has(k)) params.set(k, v)
+    }
+  }
+  const code = params.get('code') ?? undefined
+  const error = params.get('error') ?? undefined
+  if (!code && !error) return undefined
+  return {
+    code,
+    state: params.get('state') ?? undefined,
+    error,
+    errorDescription: params.get('error_description') ?? undefined,
+  }
+}
+
+/**
+ * Remove the OAuth response parameters from a URL, leaving the rest intact —
+ * query string and fragment alike. The code is single-use and lands in history,
+ * referrers and screenshots, so it goes as soon as it has been read.
  */
 export const stripOAuthParams = (href: string): string => {
   const url = new URL(href)
-  for (const key of ['code', 'state', 'error', 'error_description', 'iss']) {
-    url.searchParams.delete(key)
+  for (const key of OAUTH_PARAMS) url.searchParams.delete(key)
+  const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash
+  const q = hash.indexOf('?')
+  if (q >= 0) {
+    const params = new URLSearchParams(hash.slice(q + 1))
+    for (const key of OAUTH_PARAMS) params.delete(key)
+    const rest = params.toString()
+    url.hash = rest ? `${hash.slice(0, q)}?${rest}` : hash.slice(0, q)
   }
   return url.toString()
 }
 
-const looksLikeCallback = (): boolean => {
-  if (typeof globalThis.location === 'undefined') return false
-  const params = new URLSearchParams(globalThis.location.search)
-  return params.has('code') || params.has('error')
+// An authorization code is single-use, and React StrictMode mounts every effect
+// twice in development. Claiming happens synchronously, before any await, so
+// the second pass cannot race the first into the token endpoint (where it would
+// lose the state check and report a CSRF failure on a perfectly good flow).
+const claimedCallbacks = new Set<string>()
+
+export const claimOAuthCallback = (callback: McpOAuthCallback): boolean => {
+  const key = `${callback.code ?? ''}|${callback.state ?? ''}|${callback.error ?? ''}`
+  if (claimedCallbacks.has(key)) return false
+  claimedCallbacks.add(key)
+  return true
 }
 
-const readPending = (): PendingConnect | undefined => {
+const readRecord = <T>(key: string): T | undefined => {
   try {
-    const raw = globalThis.localStorage?.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as PendingConnect) : undefined
+    const raw = globalThis.localStorage?.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : undefined
   } catch {
     return undefined
   }
 }
 
-const writePending = (value: PendingConnect | undefined): void => {
+const writeRecord = (key: string, value: unknown): void => {
   try {
-    if (value) globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(value))
-    else globalThis.localStorage?.removeItem(STORAGE_KEY)
+    if (value) globalThis.localStorage?.setItem(key, JSON.stringify(value))
+    else globalThis.localStorage?.removeItem(key)
   } catch {
     // Private mode / storage disabled: the OAuth round-trip simply won't
     // resume automatically, which the UI already handles.
@@ -133,6 +201,41 @@ const defaultRedirectUrl = (): string =>
   typeof globalThis.location === 'undefined'
     ? ''
     : `${globalThis.location.origin}${globalThis.location.pathname}`
+
+// The MCP SDK throws this when a server demands authorization we don't have.
+// Matching on the name (not the message) keeps a tool that merely mentions
+// "401" in its output from flipping the UI into an auth prompt.
+const isUnauthorized = (err: unknown): boolean =>
+  err instanceof Error && err.name === 'UnauthorizedError'
+
+/**
+ * Wrap each tool so a mid-session authorization failure is visible. Without
+ * this the panel keeps reporting "connected" while every call fails: the core
+ * refreshes silently on a 401, but once the refresh token is gone (revoked,
+ * expired) it can only ask for a new authorization.
+ */
+const watchAuthorization = (tools: AgentToolSet, onUnauthorized: () => void): AgentToolSet => {
+  const entries = Object.entries(tools as Record<string, unknown>).map(([name, value]) => {
+    const tool = value as { execute?: (args: unknown, options: unknown) => Promise<unknown> }
+    if (typeof tool.execute !== 'function') return [name, value]
+    const execute = tool.execute.bind(tool)
+    return [
+      name,
+      {
+        ...(value as object),
+        execute: async (args: unknown, options: unknown) => {
+          try {
+            return await execute(args, options)
+          } catch (err) {
+            if (isUnauthorized(err)) onUnauthorized()
+            throw err
+          }
+        },
+      },
+    ]
+  })
+  return Object.fromEntries(entries) as AgentToolSet
+}
 
 /**
  * Connect the browser agent to a remote MCP server the user names at runtime —
@@ -156,10 +259,16 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
   const [error, setError] = useState<string | undefined>(undefined)
   const [authorizationUrl, setAuthorizationUrl] = useState<string | undefined>(undefined)
   const [oauthSupported, setOauthSupported] = useState<boolean | undefined>(undefined)
-  const [completingAuthorization, setCompletingAuthorization] = useState(looksLikeCallback)
+  const [completingAuthorization, setCompletingAuthorization] = useState(
+    () => readCallbackParams() !== undefined,
+  )
 
   const connectionRef = useRef<ConnectedMcp | undefined>(undefined)
   const providerRef = useRef<BrowserOAuthProvider | undefined>(undefined)
+  // Bumped by every connect / disconnect / unmount. A handshake that finishes
+  // after its epoch has passed closes itself instead of writing state or
+  // leaking an open MCP session onto a dead component.
+  const epochRef = useRef(0)
   // Options land in a ref so `connect` keeps a stable identity: it is a natural
   // dependency of effects in host components.
   const optionsRef = useRef(options)
@@ -171,9 +280,24 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
     if (open) await open.close().catch(() => {})
   }, [])
 
+  const checkOAuthSupport = useCallback(async () => {
+    try {
+      const mod = await loadMcp()
+      const supported = typeof mod.BrowserOAuthProvider === 'function'
+      setOauthSupported(supported)
+      return supported
+    } catch {
+      setOauthSupported(false)
+      return false
+    }
+  }, [])
+
   const connect = useCallback(
     async (opts: McpConnectOptions) => {
+      const epoch = ++epochRef.current
+      const current = () => epochRef.current === epoch
       await closeConnection()
+      if (!current()) return
       setStatus('connecting')
       setError(undefined)
       setAuthorizationUrl(undefined)
@@ -189,23 +313,24 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
         if (opts.oauth) {
           if (!mod.BrowserOAuthProvider) throw new Error(OAUTH_UNSUPPORTED)
           const oauth = typeof opts.oauth === 'object' ? opts.oauth : {}
-          const redirectUrl = oauth.redirectUrl ?? defaultRedirectUrl()
-          authProvider = new mod.BrowserOAuthProvider({
-            serverUrl: opts.url,
-            redirectUrl,
-            clientName: oauth.clientName ?? optionsRef.current.clientName,
-            scope: oauth.scope,
-          })
-          providerRef.current = authProvider
-          // Remember enough to rebuild this provider after the redirect: the
-          // page will be reloaded from scratch when the user comes back.
-          writePending({
+          const record: OAuthRecord = {
             url: opts.url,
             name,
-            redirectUrl,
+            redirectUrl: oauth.redirectUrl ?? defaultRedirectUrl(),
             scope: oauth.scope,
             clientName: oauth.clientName ?? optionsRef.current.clientName,
+          }
+          authProvider = new mod.BrowserOAuthProvider({
+            serverUrl: record.url,
+            redirectUrl: record.redirectUrl,
+            clientName: record.clientName,
+            scope: record.scope,
           })
+          providerRef.current = authProvider
+          // `pending` resumes the redirect; `oauth` outlives it so tokens stay
+          // addressable for forgetAuthorization() after a reload.
+          writeRecord(PENDING_KEY, record)
+          writeRecord(OAUTH_KEY, record)
         } else {
           providerRef.current = undefined
         }
@@ -221,11 +346,17 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
           { clientName: optionsRef.current.clientName, onLog: optionsRef.current.onLog },
         )
 
+        if (!current()) {
+          // Unmounted, or another connect started while we were shaking hands.
+          await connection.close().catch(() => {})
+          return
+        }
+
         const outcome = describeMcpResult(connection.results[0])
         if (outcome.status !== 'connected') {
           await connection.close().catch(() => {})
           if (outcome.status === 'needs-authorization') {
-            const url = providerRef.current?.authorizationUrl
+            const url = authProvider?.authorizationUrl
             setAuthorizationUrl(url ? String(url) : undefined)
             setStatus('needs-authorization')
             return
@@ -234,10 +365,18 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
         }
 
         connectionRef.current = connection
-        setTools(connection.tools)
+        setTools(
+          watchAuthorization(connection.tools, () => {
+            if (!current()) return
+            const url = providerRef.current?.authorizationUrl
+            if (url) setAuthorizationUrl(String(url))
+            setStatus('needs-authorization')
+          }),
+        )
         setCatalog(connection.catalog)
         setStatus('connected')
       } catch (err) {
+        if (!current()) return
         setError(err instanceof Error ? err.message : String(err))
         setStatus('error')
       }
@@ -246,6 +385,7 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
   )
 
   const disconnect = useCallback(async () => {
+    epochRef.current++
     await closeConnection()
     setTools(undefined)
     setCatalog([])
@@ -261,8 +401,25 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
   }, [authorizationUrl])
 
   const forgetAuthorization = useCallback(async () => {
-    writePending(undefined)
-    await providerRef.current?.reset().catch(() => {})
+    const record = readRecord<OAuthRecord>(OAUTH_KEY)
+    writeRecord(PENDING_KEY, undefined)
+    writeRecord(OAUTH_KEY, undefined)
+    // After a reload there is no live provider, but the tokens are still in the
+    // vault — rebuild one for the same server so "forget" actually forgets
+    // rather than only resetting the UI.
+    let provider = providerRef.current
+    if (!provider && record) {
+      const mod = await loadMcp().catch(() => undefined)
+      if (mod?.BrowserOAuthProvider) {
+        provider = new mod.BrowserOAuthProvider({
+          serverUrl: record.url,
+          redirectUrl: record.redirectUrl,
+          clientName: record.clientName,
+          scope: record.scope,
+        })
+      }
+    }
+    await provider?.reset().catch(() => {})
     providerRef.current = undefined
     await disconnect()
   }, [disconnect])
@@ -270,18 +427,37 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
   // Resume an OAuth round-trip: the authorization server has just sent the user
   // back with ?code=… and this component is mounting for the first time.
   useEffect(() => {
-    if (!looksLikeCallback()) {
+    // Everything up to the first await runs synchronously, on purpose: React
+    // flushes the remaining passive effects (which may rewrite location) before
+    // an awaited continuation resumes, and StrictMode runs this effect twice.
+    const callback = readCallbackParams()
+    if (!callback) {
       setCompletingAuthorization(false)
       return
     }
+    const pending = readRecord<OAuthRecord>(PENDING_KEY)
+    if (!pending) {
+      // Not our callback — another sign-in flow on this page may still need
+      // those parameters, so leave the URL exactly as we found it.
+      setCompletingAuthorization(false)
+      return
+    }
+    if (!claimOAuthCallback(callback)) {
+      setCompletingAuthorization(false)
+      return
+    }
+    // Ours, and claimed: the code is in hand, so clear it from the address bar
+    // now rather than after the reconnect.
+    if (typeof globalThis.history !== 'undefined') {
+      globalThis.history.replaceState(null, '', stripOAuthParams(globalThis.location.href))
+    }
+
     let cancelled = false
     void (async () => {
-      const pending = readPending()
       try {
         const mod = await loadMcp()
         setOauthSupported(typeof mod.BrowserOAuthProvider === 'function')
-        const callback = mod.readOAuthCallback?.()
-        if (!callback || !pending || !mod.BrowserOAuthProvider || !mod.finishMcpOAuth) return
+        if (!mod.BrowserOAuthProvider || !mod.finishMcpOAuth) throw new Error(OAUTH_UNSUPPORTED)
         const provider = new mod.BrowserOAuthProvider({
           serverUrl: pending.url,
           redirectUrl: pending.redirectUrl ?? defaultRedirectUrl(),
@@ -290,20 +466,18 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
         })
         providerRef.current = provider
         await mod.finishMcpOAuth(provider, callback)
+        writeRecord(PENDING_KEY, undefined)
         if (cancelled) return
+        // Hand back to `connect`, which owns the status from here — a slow or
+        // hung handshake must not leave the UI stuck on "finishing".
+        setCompletingAuthorization(false)
         await connect({ url: pending.url, name: pending.name, oauth: true })
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err))
-          setStatus('error')
-        }
+        writeRecord(PENDING_KEY, undefined)
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : String(err))
+        setStatus('error')
       } finally {
-        writePending(undefined)
-        // Drop the one-time code from the address bar whatever happened, so a
-        // reload can't replay a spent (or failed) authorization.
-        if (typeof globalThis.history !== 'undefined') {
-          globalThis.history.replaceState(null, '', stripOAuthParams(globalThis.location.href))
-        }
         if (!cancelled) setCompletingAuthorization(false)
       }
     })()
@@ -313,7 +487,13 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
     // Runs once: `connect` is stable and the callback exists only on first load.
   }, [connect])
 
-  useEffect(() => () => void closeConnection(), [closeConnection])
+  useEffect(
+    () => () => {
+      epochRef.current++
+      void closeConnection()
+    },
+    [closeConnection],
+  )
 
   return {
     status,
@@ -327,5 +507,6 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
     disconnect,
     authorize,
     forgetAuthorization,
+    checkOAuthSupport,
   }
 }

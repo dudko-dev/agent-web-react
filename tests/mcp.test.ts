@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { describeMcpResult, stripOAuthParams } from '../dist/index.js'
+import {
+  claimOAuthCallback,
+  describeMcpResult,
+  readCallbackParams,
+  stripOAuthParams,
+} from '../dist/index.js'
 
 // The connect/OAuth machinery lives in the core and is covered there; what this
 // package owns is the mapping from a connect outcome to UI state, and the URL
@@ -57,4 +62,52 @@ test('stripOAuthParams: drops an error response too', () => {
 
 test('stripOAuthParams: leaves a clean URL untouched', () => {
   assert.equal(stripOAuthParams('https://app.test/demo/'), 'https://app.test/demo/')
+})
+
+// The callback has to be read synchronously, before the hook's first await:
+// React flushes the rest of the app's effects in between, and one of them may
+// rewrite location (the demo's own view router did exactly that).
+
+test('readCallbackParams: reads a query-string callback', () => {
+  assert.deepEqual(readCallbackParams('https://app.test/demo/?code=abc&state=xyz'), {
+    code: 'abc',
+    state: 'xyz',
+    error: undefined,
+    errorDescription: undefined,
+  })
+})
+
+test('readCallbackParams: reads a callback carried in a hash route', () => {
+  assert.deepEqual(readCallbackParams('https://app.test/#/cb?code=abc&state=xyz'), {
+    code: 'abc',
+    state: 'xyz',
+    error: undefined,
+    errorDescription: undefined,
+  })
+})
+
+test('readCallbackParams: reads a denial, and ignores a URL carrying neither', () => {
+  const denied = readCallbackParams('https://app.test/?error=access_denied&error_description=nope')
+  assert.equal(denied?.error, 'access_denied')
+  assert.equal(denied?.errorDescription, 'nope')
+  assert.equal(readCallbackParams('https://app.test/demo/?view=mcp'), undefined)
+  assert.equal(readCallbackParams('not a url'), undefined)
+})
+
+test('stripOAuthParams: clears a callback carried in the fragment too', () => {
+  assert.equal(
+    stripOAuthParams('https://app.test/#/cb?code=abc&state=xyz&tab=tools'),
+    'https://app.test/#/cb?tab=tools',
+  )
+  assert.equal(stripOAuthParams('https://app.test/#/cb?code=abc'), 'https://app.test/#/cb')
+})
+
+test('claimOAuthCallback: a code can only be claimed once', () => {
+  const callback = { code: 'single-use', state: 'st' }
+  // StrictMode mounts every effect twice in development; the second pass must
+  // not race the first into the token endpoint, where it would lose the
+  // single-use state check and report a CSRF failure on a good flow.
+  assert.equal(claimOAuthCallback(callback), true)
+  assert.equal(claimOAuthCallback({ ...callback }), false)
+  assert.equal(claimOAuthCallback({ code: 'another', state: 'st' }), true)
 })

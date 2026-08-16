@@ -51,8 +51,18 @@ export const McpPanel = ({ mcp }: McpPanelProps) => {
     }
   }, [form])
 
+  // Resolve OAuth support the moment the user reaches for it, not after they
+  // have filled the form and pressed Connect. It loads the core's optional
+  // subpath, so it stays lazy.
+  const check = mcp.checkOAuthSupport
+  useEffect(() => {
+    if (form.mode === 'oauth') void check()
+  }, [form.mode, check])
+
+  const oauthUnavailable = form.mode === 'oauth' && mcp.oauthSupported === false
+
   const busy = mcp.status === 'connecting' || mcp.completingAuthorization
-  const canConnect = form.url.trim().length > 0 && !busy
+  const canConnect = form.url.trim().length > 0 && !busy && !oauthUnavailable
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -121,13 +131,19 @@ export const McpPanel = ({ mcp }: McpPanelProps) => {
           </label>
         )}
 
-        {form.mode === 'oauth' && (
-          <p className="settings__note">
-            No client ID needed: the app registers itself with your server’s authorization server
-            (RFC 7591), runs PKCE, and refreshes the access token on its own when it expires. Tokens
-            are stored encrypted in IndexedDB.
-          </p>
-        )}
+        {form.mode === 'oauth' &&
+          (oauthUnavailable ? (
+            <p className="settings__warn">
+              This build of <code>@dudko.dev/agent-web</code> has no MCP OAuth support — upgrade the
+              core, or use a bearer token here.
+            </p>
+          ) : (
+            <p className="settings__note">
+              No client ID needed: the app registers itself with your server’s authorization server
+              (RFC 7591), runs PKCE, and refreshes the access token on its own when it expires.
+              Tokens are stored encrypted in IndexedDB.
+            </p>
+          ))}
 
         <div className="mcp__actions">
           {mcp.status === 'connected' ? (
