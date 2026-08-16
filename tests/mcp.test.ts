@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   claimOAuthCallback,
   describeMcpResult,
+  isUnauthorizedError,
   readCallbackParams,
   stripOAuthParams,
 } from '../dist/index.js'
@@ -110,4 +111,30 @@ test('claimOAuthCallback: a code can only be claimed once', () => {
   assert.equal(claimOAuthCallback(callback), true)
   assert.equal(claimOAuthCallback({ ...callback }), false)
   assert.equal(claimOAuthCallback({ code: 'another', state: 'st' }), true)
+})
+
+// The SDK's UnauthorizedError never assigns `this.name`, so it reads as
+// "Error" — a name check silently never fires, which is how the mid-session
+// re-authorization prompt shipped as dead code.
+
+test('isUnauthorizedError: matches the core-exported class by identity', () => {
+  class UnauthorizedError extends Error {}
+  const mod = { UnauthorizedError } as never
+  assert.equal(isUnauthorizedError(new UnauthorizedError('Unauthorized'), mod), true)
+  assert.equal(isUnauthorizedError(new Error('Unauthorized'), mod), false)
+})
+
+test('isUnauthorizedError: falls back to the constructor name on an older core', () => {
+  class UnauthorizedError extends Error {}
+  const err = new UnauthorizedError()
+  assert.equal(err.name, 'Error', 'guards the assumption behind the fallback')
+  assert.equal(isUnauthorizedError(err), true)
+})
+
+test('isUnauthorizedError: a tool whose own error mentions "unauthorized" is not auth', () => {
+  // The connector throws a failing tool's text verbatim, so message matching
+  // would flip the UI into an auth prompt for an ordinary tool failure.
+  assert.equal(isUnauthorizedError(new Error('unauthorized: quota exceeded')), false)
+  assert.equal(isUnauthorizedError('not an error'), false)
+  assert.equal(isUnauthorizedError(undefined), false)
 })

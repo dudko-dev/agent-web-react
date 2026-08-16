@@ -70,7 +70,14 @@ interface OAuthRecord {
   redirectUrl: string
   scope?: string
   clientName?: string
+  /** When the redirect was started, so a stale record can't claim a callback. */
+  startedAt?: number
 }
+
+// A round-trip to an authorization server and back takes seconds. Anything
+// older than this is not the flow that produced the ?code= we are looking at —
+// most likely another sign-in on the same page — so we leave it alone.
+const PENDING_TTL_MS = 10 * 60 * 1000
 
 let modulePromise: Promise<McpModule> | undefined
 
@@ -202,11 +209,21 @@ const defaultRedirectUrl = (): string =>
     ? ''
     : `${globalThis.location.origin}${globalThis.location.pathname}`
 
-// The MCP SDK throws this when a server demands authorization we don't have.
-// Matching on the name (not the message) keeps a tool that merely mentions
-// "401" in its output from flipping the UI into an auth prompt.
-const isUnauthorized = (err: unknown): boolean =>
-  err instanceof Error && err.name === 'UnauthorizedError'
+/**
+ * Did this error come from the server refusing our authorization?
+ *
+ * Identity, not strings: the SDK's `UnauthorizedError` never assigns
+ * `this.name` (so it reads as "Error"), and its message would also match a
+ * tool whose own error text mentions "unauthorized" — the connector throws a
+ * failing tool's text verbatim. The class is re-exported by the core's `./mcp`
+ * subpath for exactly this; `constructor.name` is the fallback for a core too
+ * old to export it.
+ */
+export const isUnauthorizedError = (err: unknown, mod?: McpModule): boolean => {
+  if (!(err instanceof Error)) return false
+  if (mod?.UnauthorizedError && err instanceof mod.UnauthorizedError) return true
+  return err.constructor?.name === 'UnauthorizedError'
+}
 
 /**
  * Wrap each tool so a mid-session authorization failure is visible. Without
@@ -214,25 +231,35 @@ const isUnauthorized = (err: unknown): boolean =>
  * refreshes silently on a 401, but once the refresh token is gone (revoked,
  * expired) it can only ask for a new authorization.
  */
-const watchAuthorization = (tools: AgentToolSet, onUnauthorized: () => void): AgentToolSet => {
+const watchAuthorization = (
+  tools: AgentToolSet,
+  mod: McpModule,
+  onUnauthorized: () => void,
+): AgentToolSet => {
   const entries = Object.entries(tools as Record<string, unknown>).map(([name, value]) => {
-    const tool = value as { execute?: (args: unknown, options: unknown) => Promise<unknown> }
+    const tool = value as { execute?: (args: unknown, options: unknown) => unknown }
     if (typeof tool.execute !== 'function') return [name, value]
     const execute = tool.execute.bind(tool)
-    return [
-      name,
-      {
-        ...(value as object),
-        execute: async (args: unknown, options: unknown) => {
-          try {
-            return await execute(args, options)
-          } catch (err) {
-            if (isUnauthorized(err)) onUnauthorized()
+    const watched = (args: unknown, options: unknown): unknown => {
+      // Deliberately not an async function: the AI SDK inspects what `execute`
+      // returns SYNCHRONOUSLY to decide whether a tool streams (isAsyncIterable),
+      // so wrapping everything in a promise would collapse a streaming tool into
+      // a single opaque result.
+      try {
+        const out = execute(args, options)
+        if (out && typeof (out as Promise<unknown>).then === 'function') {
+          return (out as Promise<unknown>).then(undefined, (err: unknown) => {
+            if (isUnauthorizedError(err, mod)) onUnauthorized()
             throw err
-          }
-        },
-      },
-    ]
+          })
+        }
+        return out
+      } catch (err) {
+        if (isUnauthorizedError(err, mod)) onUnauthorized()
+        throw err
+      }
+    }
+    return [name, { ...(value as object), execute: watched }]
   })
   return Object.fromEntries(entries) as AgentToolSet
 }
@@ -319,6 +346,7 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
             redirectUrl: oauth.redirectUrl ?? defaultRedirectUrl(),
             scope: oauth.scope,
             clientName: oauth.clientName ?? optionsRef.current.clientName,
+            startedAt: Date.now(),
           }
           authProvider = new mod.BrowserOAuthProvider({
             serverUrl: record.url,
@@ -365,8 +393,11 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
         }
 
         connectionRef.current = connection
+        // The round-trip is over: a stale record would later make an unrelated
+        // ?code= on this page look like ours.
+        writeRecord(PENDING_KEY, undefined)
         setTools(
-          watchAuthorization(connection.tools, () => {
+          watchAuthorization(connection.tools, mod, () => {
             if (!current()) return
             const url = providerRef.current?.authorizationUrl
             if (url) setAuthorizationUrl(String(url))
@@ -436,9 +467,15 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
       return
     }
     const pending = readRecord<OAuthRecord>(PENDING_KEY)
-    if (!pending) {
-      // Not our callback — another sign-in flow on this page may still need
-      // those parameters, so leave the URL exactly as we found it.
+    // A record only proves that WE started a flow, not that THIS callback is
+    // its answer — so an expired one is treated as somebody else's. Either way
+    // the URL is left exactly as we found it: another sign-in flow on this page
+    // may still need those parameters.
+    const fresh =
+      pending !== undefined &&
+      (pending.startedAt === undefined || Date.now() - pending.startedAt < PENDING_TTL_MS)
+    if (!pending || !fresh) {
+      if (pending) writeRecord(PENDING_KEY, undefined)
       setCompletingAuthorization(false)
       return
     }
@@ -452,7 +489,6 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
       globalThis.history.replaceState(null, '', stripOAuthParams(globalThis.location.href))
     }
 
-    let cancelled = false
     void (async () => {
       try {
         const mod = await loadMcp()
@@ -467,23 +503,25 @@ export const useMcp = (options: UseMcpOptions = {}): UseMcpReturn => {
         providerRef.current = provider
         await mod.finishMcpOAuth(provider, callback)
         writeRecord(PENDING_KEY, undefined)
-        if (cancelled) return
+        // NOT gated on `cancelled`. StrictMode's simulated cleanup sets it in
+        // development, and the second setup cannot take over — the code has
+        // already been claimed and stripped from the URL — so bailing here
+        // would finish the authorization and then never connect. `connect` is
+        // epoch-guarded and a setState after a real unmount is a no-op, so
+        // letting it run is safe either way.
+        //
         // Hand back to `connect`, which owns the status from here — a slow or
         // hung handshake must not leave the UI stuck on "finishing".
         setCompletingAuthorization(false)
         await connect({ url: pending.url, name: pending.name, oauth: true })
       } catch (err) {
         writeRecord(PENDING_KEY, undefined)
-        if (cancelled) return
         setError(err instanceof Error ? err.message : String(err))
         setStatus('error')
       } finally {
-        if (!cancelled) setCompletingAuthorization(false)
+        setCompletingAuthorization(false)
       }
     })()
-    return () => {
-      cancelled = true
-    }
     // Runs once: `connect` is stable and the callback exists only on first load.
   }, [connect])
 

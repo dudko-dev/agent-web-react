@@ -7,11 +7,18 @@ export {
   useMcp,
   claimOAuthCallback,
   describeMcpResult,
+  isUnauthorizedError,
   readCallbackParams,
   stripOAuthParams,
 } from './hooks/use-mcp.js'
 export type { McpConnectOptions, McpStatus, UseMcpOptions, UseMcpReturn } from './hooks/use-mcp.js'
-export type { ConnectedMcp, McpCatalogEntry, McpServerResult, McpModule } from './mcp-types.js'
+export type {
+  ConnectedMcp,
+  McpCatalogEntry,
+  McpOAuthCallback,
+  McpServerResult,
+  McpModule,
+} from './mcp-types.js'
 export { useWebLLMModel } from './hooks/use-webllm-model.js'
 export type {
   UseWebLLMModelReturn,

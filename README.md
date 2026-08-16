@@ -273,7 +273,7 @@ const config = { model, tools: { ...myTools, ...mcp.tools } }
 
 `useMcp` returns `{ status, tools, catalog, error, authorizationUrl,
 oauthSupported, completingAuthorization, connect, disconnect, authorize,
-forgetAuthorization }`. `status` is
+forgetAuthorization, checkOAuthSupport }`. `status` is
 `idle | connecting | connected | needs-authorization | error`.
 
 The OAuth round-trip navigates away from your app, so the hook persists what it

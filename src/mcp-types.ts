@@ -68,4 +68,9 @@ export interface McpModule {
   BrowserOAuthProvider?: new (opts: BrowserOAuthProviderOptions) => BrowserOAuthProvider
   readOAuthCallback?: (input?: string | URL) => McpOAuthCallback | undefined
   finishMcpOAuth?: (provider: BrowserOAuthProvider, callback: McpOAuthCallback) => Promise<void>
+  /**
+   * The SDK's error class, re-exported by the core so an authorization failure
+   * can be recognised by identity. Absent on cores older than 0.0.12.
+   */
+  UnauthorizedError?: new (message?: string) => Error
 }
