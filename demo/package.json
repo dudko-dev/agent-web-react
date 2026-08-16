@@ -16,6 +16,7 @@
     "@browser-ai/web-llm": "^2.0.0",
     "@dudko.dev/agent-web": "^0.0.6",
     "@mlc-ai/web-llm": "^0.2.79",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "ai": "^6.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

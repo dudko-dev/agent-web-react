@@ -1,9 +1,24 @@
 # agent-web-react — demo
 
 A Vite + React app showcasing [`@dudko.dev/agent-web-react`](../): an in-browser
-LLM agent that edits a sticky-notes board through tools. Pick a cloud model
-(bring your own key, stored encrypted) or load a local WebGPU model — everything
-runs in the browser.
+LLM agent driving tools. Pick a cloud model (bring your own key, stored
+encrypted) or load a local WebGPU model — everything runs in the browser.
+
+Two panels:
+
+- **Sticky notes** — the agent edits a board through locally defined tools.
+- **Your MCP server** — paste any remote MCP endpoint and the agent picks up
+  *its* tools. Auth is none, a bearer token, or **OAuth 2.1 + dynamic client
+  registration**: the app registers itself with your authorization server, runs
+  PKCE, keeps the tokens encrypted in IndexedDB and refreshes them on expiry.
+  The server must send CORS headers for this origin (including
+  `Access-Control-Expose-Headers: WWW-Authenticate, mcp-session-id`) — the
+  browser talks to it directly, nothing is proxied.
+
+> The OAuth panel needs a core that exports `BrowserOAuthProvider`. The repo
+> pins `@dudko.dev/agent-web` as a devDependency for the aliased build; bump it
+> once a core with MCP OAuth is published, or the panel reports that OAuth is
+> unavailable and only header auth works.
 
 **Live:** https://dudko-dev.github.io/agent-web-react/
 
