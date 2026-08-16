@@ -110,7 +110,7 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@dudko.dev/agent-web": "^0.0.12",
+    "@dudko.dev/agent-web": "^0.0.13",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.9.0",
