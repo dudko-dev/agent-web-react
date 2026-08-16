@@ -287,8 +287,10 @@ Two notes:
   and is loaded with a **dynamic import**, so apps that never call `connect`
   don't pay for `@modelcontextprotocol/sdk`. Install it alongside the core when
   you do use MCP.
-- `oauthSupported` is `false` on cores older than the one that introduced
-  `BrowserOAuthProvider`; header auth still works there.
+- `oauthSupported` is `false` on cores older than `@dudko.dev/agent-web@0.0.9`,
+  which introduced `BrowserOAuthProvider`; header auth still works there. The
+  peer floor is `>=0.0.11` — that is the first core whose own peer ranges
+  resolve against AI SDK v7.
 
 ## Components
 

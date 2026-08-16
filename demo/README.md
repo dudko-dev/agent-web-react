@@ -15,10 +15,9 @@ Two panels:
   `Access-Control-Expose-Headers: WWW-Authenticate, mcp-session-id`) — the
   browser talks to it directly, nothing is proxied.
 
-> The OAuth panel needs a core that exports `BrowserOAuthProvider`. The repo
-> pins `@dudko.dev/agent-web` as a devDependency for the aliased build; bump it
-> once a core with MCP OAuth is published, or the panel reports that OAuth is
-> unavailable and only header auth works.
+> The OAuth panel needs a core that exports `BrowserOAuthProvider`
+> (`@dudko.dev/agent-web` ≥ 0.0.9). On an older core the panel says so and
+> disables Connect for that mode; header auth is unaffected.
 
 **Live:** https://dudko-dev.github.io/agent-web-react/
 

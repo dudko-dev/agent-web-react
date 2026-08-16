@@ -10,14 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.0",
-    "@ai-sdk/google": "^3.0.0",
-    "@ai-sdk/openai": "^3.0.0",
-    "@browser-ai/web-llm": "^2.0.0",
-    "@dudko.dev/agent-web": "^0.0.6",
-    "@mlc-ai/web-llm": "^0.2.79",
+    "@ai-sdk/anthropic": "^4.0.39",
+    "@ai-sdk/google": "^4.0.44",
+    "@ai-sdk/openai": "^4.0.42",
+    "@browser-ai/web-llm": "^3.0.2",
+    "@dudko.dev/agent-web": "^0.0.11",
+    "@mlc-ai/web-llm": "^0.2.84",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "ai": "^6.0.0",
+    "ai": "^7.0.66",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^4.4.3"
