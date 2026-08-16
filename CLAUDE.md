@@ -40,6 +40,9 @@ The repo also contains a **Vite demo** (`demo/`) that is auto-deployed to
 - `src/styles.css` — optional theme (light + dark).
 - `src/index.ts` — public surface (+ curated re-exports from the core).
 - `tests/state.test.ts` — `node --test` over the reducer (imports from `dist`).
+- `e2e/` — Playwright over the built demo: the OAuth redirect round-trip,
+  IndexedDB reuse, CORS. `servers.ts` starts a real MCP server + authorization
+  server on loopback.
 - `demo/` — the Vite + React demo (aliases the library to `../dist`).
 
 ## Commands
@@ -49,6 +52,7 @@ npm run typecheck     # tsc --noEmit
 npm run format:check  # prettier
 npm run build         # tsup → dist (ESM + CJS + d.ts) + copy styles.css
 npm test              # node --test tests/*.test.ts (pretest builds)
+npm run test:e2e      # playwright over the built demo (browser flows)
 
 # demo
 cd demo && npm install && npm run dev      # local dev (rebuild the lib first)
@@ -56,7 +60,8 @@ cd demo && npm run typecheck && npm run build
 ```
 
 CI (`.github/workflows/ci.yml`) runs the library job (typecheck → format:check →
-build → test) then a demo job (build lib → build demo). Release (`release.yml`)
+build → test), then a demo job (build lib → build demo) and a browser job
+(Playwright over the built demo). Release (`release.yml`)
 publishes to npm via Trusted Publishing after CI passes on `main`. Pages
 (`deploy-demo.yml`) builds and deploys the demo. Keep all green before pushing.
 
