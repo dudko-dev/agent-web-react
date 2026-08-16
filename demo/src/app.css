@@ -273,3 +273,170 @@ a {
   text-align: center;
   padding-bottom: 4px;
 }
+
+/* ── View tabs ────────────────────────────────────────────────────────────── */
+.app__tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.app__tab {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.app__tab.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.app__empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+/* ── MCP panel ────────────────────────────────────────────────────────────── */
+.mcp {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 100%;
+  overflow: auto;
+}
+.mcp__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mcp__input {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.mcp__modes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mcp__mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mcp__mode.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mcp__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.mcp__btn-ghost {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.mcp__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.mcp__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.mcp__status--connected .mcp__dot {
+  background: #16a34a;
+}
+.mcp__status--connecting .mcp__dot {
+  background: #f59e0b;
+}
+.mcp__status--needs-authorization .mcp__dot {
+  background: #6366f1;
+}
+.mcp__status--error .mcp__dot {
+  background: #dc2626;
+}
+.mcp__auth {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.mcp__auth p {
+  margin: 0;
+  color: var(--muted);
+}
+.mcp__tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mcp__tool {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.mcp__tool code {
+  font-size: 12px;
+  color: var(--accent);
+}
+.mcp__tool span {
+  color: var(--muted);
+}
+.mcp__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.mcp__hint code {
+  font-size: 11px;
+}

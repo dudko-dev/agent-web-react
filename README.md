@@ -252,6 +252,46 @@ function CloudAgent() {
 The [`demo/`](demo/) app does exactly this — see
 [`demo/src/providers.ts`](demo/src/providers.ts).
 
+## The `useMcp` hook — connect a remote MCP server
+
+Let the user name their own MCP server at runtime and hand its tools to the
+agent. Auth is either a static header or the full OAuth 2.1 flow with **dynamic
+client registration** — no client ID to configure, and the access token is
+refreshed for you when it expires mid-run.
+
+```tsx
+const mcp = useMcp({ clientName: 'my-app' })
+
+await mcp.connect({ url, oauth: true })       // or { url, headers: { Authorization } }
+
+// The server wants a sign-in: send the user off from a real click.
+{mcp.status === 'needs-authorization' && <button onClick={mcp.authorize}>Authorize</button>}
+
+// Then just merge the tools into any agent config.
+const config = { model, tools: { ...myTools, ...mcp.tools } }
+```
+
+`useMcp` returns `{ status, tools, catalog, error, authorizationUrl,
+oauthSupported, completingAuthorization, connect, disconnect, authorize,
+forgetAuthorization, checkOAuthSupport }`. `status` is
+`idle | connecting | connected | needs-authorization | error`.
+
+The OAuth round-trip navigates away from your app, so the hook persists what it
+needs and, on the way back, finishes the code exchange, strips `?code=…` from
+the address bar and reconnects before rendering — `completingAuthorization`
+covers that window.
+
+Two notes:
+
+- The connector lives in the core's optional `@dudko.dev/agent-web/mcp` subpath
+  and is loaded with a **dynamic import**, so apps that never call `connect`
+  don't pay for `@modelcontextprotocol/sdk`. Install it alongside the core when
+  you do use MCP.
+- `oauthSupported` is `false` on cores older than `@dudko.dev/agent-web@0.0.9`,
+  which introduced `BrowserOAuthProvider`; header auth still works there. The
+  peer floor is `>=0.0.11` — that is the first core whose own peer ranges
+  resolve against AI SDK v7.
+
 ## Components
 
 All components are optional and styled by `styles.css` (class-prefixed `awr-`,

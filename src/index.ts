@@ -3,6 +3,22 @@ export { useAgent } from './hooks/use-agent.js'
 export type { UseAgentOptions, UseAgentReturn } from './hooks/use-agent.js'
 export { useCredentials } from './hooks/use-credentials.js'
 export type { UseCredentialsReturn } from './hooks/use-credentials.js'
+export {
+  useMcp,
+  claimOAuthCallback,
+  describeMcpResult,
+  isUnauthorizedError,
+  readCallbackParams,
+  stripOAuthParams,
+} from './hooks/use-mcp.js'
+export type { McpConnectOptions, McpStatus, UseMcpOptions, UseMcpReturn } from './hooks/use-mcp.js'
+export type {
+  ConnectedMcp,
+  McpCatalogEntry,
+  McpOAuthCallback,
+  McpServerResult,
+  McpModule,
+} from './mcp-types.js'
 export { useWebLLMModel } from './hooks/use-webllm-model.js'
 export type {
   UseWebLLMModelReturn,

@@ -29,10 +29,14 @@ The repo also contains a **Vite demo** (`demo/`) that is auto-deployed to
 
 - `src/state.ts` — the pure `agentStateReducer` + `createInitialAgentState`.
 - `src/types.ts` — `AgentUiState`, `ChatMessage`, `StepView`, `ToolCallView`, …
-- `src/hooks/` — `use-agent` (the hook), `use-credentials` (vault), `use-webllm-model`.
+- `src/hooks/` — `use-agent` (the hook), `use-credentials` (vault),
+  `use-webllm-model`, `use-mcp` (remote MCP + OAuth round-trip).
+- `src/mcp-types.ts` — structural types for the core's optional `./mcp` subpath,
+  which `use-mcp` loads with a dynamic import (never a static one).
 - `src/context.tsx` — `AgentProvider` + `useAgentContext`.
 - `src/components/` — `AgentChat`, `MessageList`, `Composer`, `PlanView`,
   `StepList`, `ModelLoadBar`, `UsageBadge`, `ApiKeyForm`, `icons`, `format`.
+- `demo/src/components/McpPanel.tsx` — the demo's "bring your own MCP" panel.
 - `src/styles.css` — optional theme (light + dark).
 - `src/index.ts` — public surface (+ curated re-exports from the core).
 - `tests/state.test.ts` — `node --test` over the reducer (imports from `dist`).
