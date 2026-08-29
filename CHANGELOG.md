@@ -1,7 +1,7 @@
 # 0.0.7 / 2026-08-29
 
 ### :tada: Enhancements
-- Updated dependencies: @types/react-dom, typescript
+- Updated dependencies: @types/react-dom
 
 # 0.0.6 / 2026-08-21
 
