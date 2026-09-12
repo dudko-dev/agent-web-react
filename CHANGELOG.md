@@ -1,3 +1,8 @@
+# 0.0.8 / 2026-09-12
+
+### :tada: Enhancements
+- Updated dependencies: @dudko.dev/agent-web, @playwright/test, @types/react, @types/react-dom, react, react-dom, typescript
+
 # 0.0.7 / 2026-08-29
 
 ### :tada: Enhancements
