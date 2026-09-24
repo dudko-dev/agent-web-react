@@ -14,13 +14,13 @@
     "@ai-sdk/google": "^4.0.44",
     "@ai-sdk/openai": "^4.0.42",
     "@browser-ai/web-llm": "^3.0.2",
-    "@dudko.dev/agent-web": "^0.0.13",
+    "@dudko.dev/agent-web": "^0.0.15",
     "@mlc-ai/web-llm": "^0.2.84",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "ai": "^7.0.66",
+    "ai": "^7.0.107",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
