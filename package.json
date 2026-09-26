@@ -110,13 +110,13 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@dudko.dev/agent-web": "^0.0.15",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@dudko.dev/agent-web": "^0.0.18",
+    "@modelcontextprotocol/sdk": "^1.30.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.9.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsup": "^8.5.1",
