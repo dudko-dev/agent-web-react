@@ -1,3 +1,8 @@
+# 0.0.9 / 2026-09-26
+
+### :tada: Enhancements
+- Updated dependencies: @dudko.dev/agent-web, @modelcontextprotocol/sdk, prettier
+
 # 0.0.8 / 2026-09-19
 
 ### :tada: Enhancements

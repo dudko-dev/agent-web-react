@@ -14,17 +14,17 @@
     "@ai-sdk/google": "^4.0.44",
     "@ai-sdk/openai": "^4.0.42",
     "@browser-ai/web-llm": "^3.0.2",
-    "@dudko.dev/agent-web": "^0.0.15",
+    "@dudko.dev/agent-web": "^0.0.18",
     "@mlc-ai/web-llm": "^0.2.84",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.30.1",
     "ai": "^7.0.107",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0"

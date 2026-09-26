@@ -1,6 +1,6 @@
 {
   "name": "@dudko.dev/agent-web-react",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "React bindings for @dudko.dev/agent-web: a headless useAgent hook, an AgentProvider context, and optional pre-styled components (chat panel, plan/step view, BYOK key form, WebLLM load bar) that connect the in-browser LLM agent to any React site. UI you can drop in — or a headless reducer you can build your own around.",
   "type": "module",
   "sideEffects": [
@@ -110,13 +110,13 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@dudko.dev/agent-web": "^0.0.15",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@dudko.dev/agent-web": "^0.0.18",
+    "@modelcontextprotocol/sdk": "^1.30.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.9.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsup": "^8.5.1",
