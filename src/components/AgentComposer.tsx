@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ClipboardEvent, KeyboardEvent, ReactNode, RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { ClipboardEvent, CSSProperties, KeyboardEvent, ReactNode, RefObject } from 'react'
 import type { RunFile, ToolApprovalMode, VirtualFileSystem } from '@dudko.dev/agent-web'
 import {
   attachmentKindOf,
@@ -119,6 +119,8 @@ export interface AgentComposerProps {
   showApprovalMode?: boolean
   /** Banners for limits, compaction and errors above the input (default true). */
   showNotices?: boolean
+  /** Below this width (px) the toolbar chips show icons and numbers only (default 460). */
+  compactWidth?: number
   /** Extra content in the toolbar, after the "/" button. */
   toolbarExtra?: ReactNode
   /** Extra content at the end of the toolbar, before the consent chip. */
@@ -150,6 +152,59 @@ const ModeIcon = ({ mode }: { mode: ToolApprovalMode }) =>
 type Menu = 'commands' | 'model' | 'mode' | undefined
 
 let attachSeq = 0
+
+// useLayoutEffect warns during SSR; menus only exist in the browser anyway.
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+/**
+ * Where an open menu goes: fixed, next to its anchor — above it when there is
+ * room (the composer sits at the bottom of a panel), below otherwise — so the
+ * panel's `overflow` never clips it and it never leaves the viewport.
+ */
+const useMenuPlacement = (
+  open: boolean,
+  anchor: RefObject<HTMLElement | null>,
+  align: 'left' | 'right' | 'stretch',
+): CSSProperties | undefined => {
+  const [style, setStyle] = useState<CSSProperties>()
+  useIsoLayoutEffect(() => {
+    if (!open) return
+    const place = () => {
+      const el = anchor.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const above = r.top - 8
+      const below = vh - r.bottom - 8
+      const up = above >= 240 || above >= below
+      const s: CSSProperties = {
+        maxHeight: Math.max(120, (up ? above : below) - 6),
+        top: up ? 'auto' : r.bottom + 6,
+        bottom: up ? vh - r.top + 6 : 'auto',
+        maxWidth: vw - 16,
+      }
+      if (align === 'stretch') {
+        s.left = Math.max(8, r.left)
+        s.width = Math.min(r.width, vw - 16)
+      } else if (align === 'right') {
+        s.left = 'auto'
+        s.right = Math.max(8, vw - r.right)
+      } else {
+        s.left = Math.max(8, Math.min(r.left, vw - 248))
+      }
+      setStyle(s)
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open, anchor, align])
+  return open ? style : undefined
+}
 
 const readDataUrl = (file: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -196,6 +251,7 @@ export const AgentComposer = ({
   showAgents = true,
   showApprovalMode = true,
   showNotices = true,
+  compactWidth = 460,
   toolbarExtra,
   toolbarEnd,
   renderAttachment,
@@ -213,6 +269,22 @@ export const AgentComposer = ({
   const [attachError, setAttachError] = useState<string | undefined>()
   const [dragging, setDragging] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const modelRef = useRef<HTMLSpanElement>(null)
+  const modeRef = useRef<HTMLSpanElement>(null)
+  // Where the drop overlay goes: over the whole drop zone, not just the input.
+  const [dropRect, setDropRect] = useState<CSSProperties>()
+  // A narrow composer (a phone, a side panel) keeps one toolbar row by
+  // dropping the chips' words — icons and numbers stay, words go to tooltips.
+  const [compactBar, setCompactBar] = useState(false)
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() =>
+      setCompactBar(el.getBoundingClientRect().width < compactWidth),
+    )
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [compactWidth])
   const fileRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -327,6 +399,9 @@ export const AgentComposer = ({
     slash && !/\s/.test(text.trimStart()) ? filterCommands(allCommands, slash.name) : []
   const palette = menu === 'commands' && !slash ? allCommands : matches
   const paletteOpen = palette.length > 0 && (menu === 'commands' || matches.length > 0)
+  const commandsStyle = useMenuPlacement(paletteOpen, rootRef, 'stretch')
+  const modelStyle = useMenuPlacement(menu === 'model', modelRef, 'left')
+  const modeStyle = useMenuPlacement(menu === 'mode', modeRef, 'right')
 
   useEffect(() => setActive(0), [text, menu])
 
@@ -454,6 +529,11 @@ export const AgentComposer = ({
     const onEnter = (e: Event) => {
       if (!hasFiles(e)) return
       depth += 1
+      if (target === globalThis.window) setDropRect({ inset: 0 })
+      else {
+        const r = (target as HTMLElement).getBoundingClientRect()
+        setDropRect({ left: r.left, top: r.top, width: r.width, height: r.height })
+      }
       setDragging(true)
     }
     const onOver = (e: Event) => {
@@ -603,13 +683,18 @@ export const AgentComposer = ({
 
   return (
     <div
-      className={['awr-composer2', dragging ? 'is-dragging' : '', className]
+      className={[
+        'awr-composer2',
+        dragging ? 'is-dragging' : '',
+        compactBar ? 'awr-composer2--compact' : '',
+        className,
+      ]
         .filter(Boolean)
         .join(' ')}
       ref={rootRef}
     >
       {dragging && (
-        <div className="awr-dropnote" aria-hidden="true">
+        <div className="awr-dropnote" style={dropRect} aria-hidden="true">
           {L.dropHint}
         </div>
       )}
@@ -635,7 +720,12 @@ export const AgentComposer = ({
       )}
 
       {paletteOpen && (
-        <ul className="awr-menu awr-menu--commands" role="listbox" aria-label={L.commands}>
+        <ul
+          className="awr-menu awr-menu--commands"
+          style={commandsStyle}
+          role="listbox"
+          aria-label={L.commands}
+        >
           {palette.map((c, i) => (
             <li key={`${c.group}:${c.name}`}>
               <button
@@ -758,23 +848,27 @@ export const AgentComposer = ({
             }
           >
             <span className="awr-agents__dot" aria-hidden="true" />
-            <BotIcon size={14} /> {L.agents(runningAgents.length)}
+            <BotIcon size={14} />{' '}
+            {compactBar ? runningAgents.length : L.agents(runningAgents.length)}
           </span>
         )}
         {(model || thinking) && (
-          <span className="awr-popwrap">
+          <span className="awr-popwrap awr-popwrap--model" ref={modelRef}>
             <button
               type="button"
               className="awr-tchip awr-tchip--btn"
               onClick={() => setMenu(menu === 'model' ? undefined : 'model')}
               aria-haspopup="menu"
               aria-expanded={menu === 'model'}
+              title={[model?.label, thinkingLabel].filter(Boolean).join(' · ')}
             >
-              {model?.label ?? L.model}
-              {thinkingLabel && <span className="awr-tchip__sub">{thinkingLabel}</span>}
+              <span className="awr-tchip__label">{model?.label ?? L.model}</span>
+              {thinkingLabel && !compactBar && (
+                <span className="awr-tchip__sub">{thinkingLabel}</span>
+              )}
             </button>
             {menu === 'model' && (
-              <div className="awr-menu awr-menu--pop" role="menu">
+              <div className="awr-menu awr-menu--pop" style={modelStyle} role="menu">
                 {thinking && (
                   <>
                     <div className="awr-menu__head">{L.thinking}</div>
@@ -825,7 +919,7 @@ export const AgentComposer = ({
         {toolbarEnd}
 
         {showApprovalMode && (
-          <span className="awr-popwrap">
+          <span className="awr-popwrap" ref={modeRef}>
             <button
               type="button"
               className={`awr-tchip awr-tchip--btn awr-mode awr-mode--${agent.approvalMode}`}
@@ -835,10 +929,11 @@ export const AgentComposer = ({
               aria-expanded={menu === 'mode'}
               aria-label={`${L.toolConsent}: ${MODE_CHIP[agent.approvalMode].label}`}
             >
-              <ModeIcon mode={agent.approvalMode} /> {MODE_CHIP[agent.approvalMode].label}
+              <ModeIcon mode={agent.approvalMode} />
+              {!compactBar && ` ${MODE_CHIP[agent.approvalMode].label}`}
             </button>
             {menu === 'mode' && (
-              <div className="awr-menu awr-menu--pop awr-menu--right" role="menu">
+              <div className="awr-menu awr-menu--pop" style={modeStyle} role="menu">
                 <div className="awr-menu__head">{L.toolConsent}</div>
                 {MODES.map((m) => (
                   <button

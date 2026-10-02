@@ -28,6 +28,7 @@ import { isLocal, MODELS } from './models'
 import { useNotesBoard } from './notes'
 import { buildCloudModel, createLocalModel } from './providers'
 import { RU_LABELS } from './i18n'
+import { Markdown } from './markdown'
 import {
   useDemoSettings,
   useSettingsConfig,
@@ -282,6 +283,8 @@ export const App = () => {
     theme: settings.theme,
     labels: ru ? RU_LABELS : undefined,
     files: settings.filesPanel ? workspace : undefined,
+    // Answers are Markdown — render them (any renderer plugs in here).
+    renderContent: (m) => (m.role === 'assistant' ? <Markdown text={m.content} /> : m.content),
   }
   const composer = (placeholder: string): AgentChatProps['composer'] => ({
     placeholder: ru ? undefined : placeholder,
@@ -350,7 +353,7 @@ export const App = () => {
         ))}
       </nav>
 
-      <main className="app__main">
+      <main className={`app__main app__main--${view}`}>
         <section className="app__left">
           <Settings
             models={MODELS}

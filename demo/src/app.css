@@ -88,7 +88,7 @@ a {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(320px, 420px) 1fr;
+  grid-template-columns: minmax(360px, 540px) 1fr;
   gap: 16px;
 }
 @media (max-width: 820px) {
@@ -97,6 +97,14 @@ a {
   }
   .app__main {
     grid-template-columns: 1fr;
+  }
+  .app__chat {
+    height: 78vh;
+    min-height: 420px;
+  }
+  /* On a phone the board is the game: show it before the chat. */
+  .app__main--chess .app__right {
+    order: -1;
   }
 }
 
@@ -286,8 +294,12 @@ a {
   display: flex;
   gap: 6px;
   margin-bottom: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .app__tab {
+  flex: none;
+  white-space: nowrap;
   padding: 8px 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -787,4 +799,45 @@ a {
 }
 .app__left {
   overflow-y: auto;
+}
+
+/* The demo's Markdown answers (see markdown.tsx). */
+.md {
+  white-space: normal;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md pre {
+  margin: 0 0 6px;
+}
+.md ul,
+.md ol {
+  padding-left: 20px;
+}
+.md code {
+  font-family: var(--awr-mono);
+  font-size: 0.92em;
+  background: color-mix(in srgb, var(--awr-fg) 8%, transparent);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.md pre {
+  font-family: var(--awr-mono);
+  font-size: 12px;
+  background: color-mix(in srgb, var(--awr-fg) 6%, transparent);
+  border-radius: 8px;
+  padding: 8px;
+  overflow-x: auto;
+  white-space: pre;
+}
+.md .md-h {
+  display: block;
+  margin: 4px 0;
 }

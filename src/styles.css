@@ -68,7 +68,6 @@
   font-size: 14px;
   line-height: 1.5;
   overflow: hidden;
-  container-type: inline-size;
 }
 .awr-chat__main {
   flex: 1 1 auto;
@@ -122,28 +121,13 @@
 .awr-chat--narrow .awr-chat__closeside {
   display: inline-flex;
 }
-@container (max-width: 760px) {
-  .awr-chat__sidebar,
-  .awr-chat__files {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    z-index: 5;
-    width: min(85%, 320px);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
-  }
-  .awr-chat__sidebar {
-    left: 0;
-  }
-  .awr-chat__files {
-    right: 0;
-  }
-  .awr-chat__closeside {
-    display: inline-flex;
-  }
-  .awr-status__text {
-    display: none;
-  }
+.awr-chat--narrow .awr-status__text {
+  display: none;
+}
+/* The close button sits in the panel's header row on a narrow panel. */
+.awr-chat--narrow .awr-chat__sidebar .awr-panel__head,
+.awr-chat--narrow .awr-chat__files .awr-panel__head {
+  padding-right: 40px;
 }
 .awr-chat__header {
   display: flex;
@@ -152,6 +136,10 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--awr-border);
   min-height: 44px;
+}
+.awr-chat__header .awr-usage {
+  white-space: nowrap;
+  flex: none;
 }
 .awr-chat__header .awr-chat__title {
   flex: 1 1 auto;
@@ -928,9 +916,8 @@
   border-color: var(--awr-accent);
 }
 .awr-dropnote {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
+  position: fixed;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -984,8 +971,24 @@
 .awr-toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+}
+.awr-toolbar > * {
+  flex: none;
+}
+.awr-toolbar > .awr-popwrap--model {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.awr-popwrap--model > .awr-tchip {
+  max-width: 100%;
+  min-width: 0;
+}
+.awr-tchip__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .awr-toolbar__spacer {
   flex: 1 1 auto;
@@ -1068,8 +1071,8 @@
 
 /* Menus: the "/" palette and the chip popovers. */
 .awr-menu {
-  position: absolute;
-  z-index: 10;
+  position: fixed;
+  z-index: 1000;
   margin: 0;
   padding: 4px;
   list-style: none;
@@ -1081,19 +1084,8 @@
   border-radius: 10px;
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.16);
 }
-.awr-menu--commands {
-  left: 8px;
-  right: 8px;
-  bottom: calc(100% + 6px);
-}
-.awr-menu--pop {
-  left: 0;
-  bottom: calc(100% + 6px);
-}
-.awr-menu--right {
-  left: auto;
-  right: 0;
-}
+/* Menus are placed (fixed) by the composer next to their anchor, above it
+ * when there is room, so a panel's overflow never clips them. */
 .awr-menu__head {
   padding: 6px 8px 2px;
   font-size: 11px;
@@ -1187,7 +1179,6 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-right: 28px;
 }
 .awr-history__list,
 .awr-filelist {
@@ -1271,4 +1262,44 @@
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ── Touch screens and phones ─────────────────────────────────────────────── */
+@media (pointer: coarse) {
+  .awr-iconbtn {
+    width: 38px;
+    height: 38px;
+  }
+  .awr-tchip {
+    height: 34px;
+  }
+  .awr-sendbtn {
+    width: 38px;
+    height: 38px;
+  }
+  .awr-menu__item {
+    padding: 10px 10px;
+  }
+  /* 16px keeps iOS from zooming into the field on focus. */
+  .awr-composer2__input {
+    font-size: 16px;
+  }
+}
+.awr-composer2--compact .awr-tchip {
+  padding: 0 6px;
+}
+@media (max-width: 480px) {
+  .awr-msg__col,
+  .awr-msg--assistant .awr-msg__col {
+    max-width: 100%;
+  }
+  .awr-chat__body {
+    padding: 12px 10px;
+  }
+  .awr-chat__footer {
+    padding: 6px 8px 8px;
+  }
+  .awr-thumb--msg {
+    max-width: 70vw;
+  }
 }

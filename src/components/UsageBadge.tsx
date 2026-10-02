@@ -3,6 +3,8 @@ import { formatTokens } from './format.js'
 
 export interface UsageBadgeProps {
   usage: IUsage
+  /** Only in ↑ out ↓ (the rest stays in the tooltip) — for tight headers. */
+  compact?: boolean
   className?: string
 }
 
@@ -10,7 +12,7 @@ export interface UsageBadgeProps {
  * A compact token-usage readout: in ↑ out ↓, plus thinking (🧠) and cache-hit
  * tokens when the provider reported any. The full breakdown is on hover.
  */
-export const UsageBadge = ({ usage, className }: UsageBadgeProps) => {
+export const UsageBadge = ({ usage, compact = false, className }: UsageBadgeProps) => {
   if (usage.totalTokens === 0) return null
   const reasoning = usage.reasoningTokens ?? 0
   const cached = usage.cachedInputTokens ?? 0
@@ -24,8 +26,8 @@ export const UsageBadge = ({ usage, className }: UsageBadgeProps) => {
   return (
     <span className={['awr-usage', className].filter(Boolean).join(' ')} title={title}>
       {formatTokens(usage.inputTokens)}↑ {formatTokens(usage.outputTokens)}↓
-      {reasoning > 0 && ` · ${formatTokens(reasoning)} think`}
-      {cached > 0 && ` · ${formatTokens(cached)} cached`}
+      {!compact && reasoning > 0 && ` · ${formatTokens(reasoning)} think`}
+      {!compact && cached > 0 && ` · ${formatTokens(cached)} cached`}
     </span>
   )
 }

@@ -30,6 +30,10 @@ export const ContextMeter = ({
 }: ContextMeterProps) => {
   const cached = usage.cachedInputTokens ?? 0
   const reasoning = usage.reasoningTokens ?? 0
+  // Nothing spent, nothing compacted, no budget to show: stay out of the way.
+  if (usage.totalTokens === 0 && !budget && compactions.length === 0 && !budgetTokens) {
+    return null
+  }
   const hitRate = usage.inputTokens > 0 ? Math.round((cached / usage.inputTokens) * 100) : 0
   const fill = budgetTokens ? Math.min(1, usage.totalTokens / budgetTokens) : undefined
   const last = compactions.at(-1)
@@ -38,7 +42,7 @@ export const ContextMeter = ({
       <div className="awr-context__row">
         <span title="input tokens">in {formatTokens(usage.inputTokens)}</span>
         <span title="output tokens">out {formatTokens(usage.outputTokens)}</span>
-        <span title="thinking tokens">think {formatTokens(reasoning)}</span>
+        {reasoning > 0 && <span title="thinking tokens">think {formatTokens(reasoning)}</span>}
         <span title="input tokens served from the provider's prompt cache">
           cached {formatTokens(cached)}
           {hitRate > 0 ? ` (${hitRate}%)` : ''}

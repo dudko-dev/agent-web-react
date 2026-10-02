@@ -306,7 +306,7 @@ const AgentChatInner = ({
         )}
         {showTotalUsage && (
           <span title={L.totalUsage}>
-            <UsageBadge usage={agent.totalUsage} />
+            <UsageBadge usage={agent.totalUsage} compact={narrow !== false} />
           </span>
         )}
         {files && (
