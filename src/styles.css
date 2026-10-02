@@ -921,9 +921,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--awr-accent) 12%, var(--awr-bg));
+  border: 2px dashed var(--awr-accent);
+  border-radius: var(--awr-radius);
+  background: color-mix(in srgb, var(--awr-accent) 10%, transparent);
+  backdrop-filter: blur(1px);
   color: var(--awr-accent);
+  font-family: var(--awr-font);
+  font-size: 16px;
   font-weight: 600;
   pointer-events: none;
 }
