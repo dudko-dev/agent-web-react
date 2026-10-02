@@ -58,7 +58,7 @@ export interface UseMcpReturn {
   checkOAuthSupport: () => Promise<boolean>
 }
 
-const OAUTH_UNSUPPORTED =
+export const OAUTH_UNSUPPORTED =
   'The installed @dudko.dev/agent-web has no MCP OAuth support. Upgrade the core to a version exporting BrowserOAuthProvider, or use a static Authorization header.'
 
 const PENDING_KEY = 'agent-web-react:mcp:pending'
@@ -77,7 +77,7 @@ interface OAuthRecord {
 // A round-trip to an authorization server and back takes seconds. Anything
 // older than this is not the flow that produced the ?code= we are looking at —
 // most likely another sign-in on the same page — so we leave it alone.
-const PENDING_TTL_MS = 10 * 60 * 1000
+export const PENDING_TTL_MS = 10 * 60 * 1000
 
 let modulePromise: Promise<McpModule> | undefined
 
@@ -86,7 +86,7 @@ let modulePromise: Promise<McpModule> | undefined
  * touch MCP don't pull `@modelcontextprotocol/sdk` into their bundle, and so a
  * core without the OAuth half degrades to a clear message instead of a crash.
  */
-const loadMcp = (): Promise<McpModule> => {
+export const loadMcp = (): Promise<McpModule> => {
   modulePromise ??= import('@dudko.dev/agent-web/mcp')
     .then((m) => m as unknown as McpModule)
     .catch((err: unknown) => {
@@ -183,7 +183,7 @@ export const claimOAuthCallback = (callback: McpOAuthCallback): boolean => {
   return true
 }
 
-const readRecord = <T>(key: string): T | undefined => {
+export const readRecord = <T>(key: string): T | undefined => {
   try {
     const raw = globalThis.localStorage?.getItem(key)
     return raw ? (JSON.parse(raw) as T) : undefined
@@ -192,7 +192,7 @@ const readRecord = <T>(key: string): T | undefined => {
   }
 }
 
-const writeRecord = (key: string, value: unknown): void => {
+export const writeRecord = (key: string, value: unknown): void => {
   try {
     if (value) globalThis.localStorage?.setItem(key, JSON.stringify(value))
     else globalThis.localStorage?.removeItem(key)
@@ -204,7 +204,7 @@ const writeRecord = (key: string, value: unknown): void => {
 
 // A redirect_uri must not carry a fragment (RFC 6749 §3.1.2), and it has to
 // match the registered value byte-for-byte, so query and hash are dropped.
-const defaultRedirectUrl = (): string =>
+export const defaultRedirectUrl = (): string =>
   typeof globalThis.location === 'undefined'
     ? ''
     : `${globalThis.location.origin}${globalThis.location.pathname}`
@@ -231,7 +231,7 @@ export const isUnauthorizedError = (err: unknown, mod?: McpModule): boolean => {
  * refreshes silently on a 401, but once the refresh token is gone (revoked,
  * expired) it can only ask for a new authorization.
  */
-const watchAuthorization = (
+export const watchAuthorization = (
   tools: AgentToolSet,
   mod: McpModule,
   onUnauthorized: () => void,

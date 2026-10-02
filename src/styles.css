@@ -5,7 +5,10 @@
  * properties on `.awr-chat` (or any ancestor). Ships light + dark defaults.
  */
 
-.awr-chat {
+/* Theme tokens. `.awr-chat` declares them; wrap standalone components
+ * (AgentComposer, FilesPanel, …) in an element with class `awr-theme` to get
+ * them too. `data-awr-theme="light|dark"` forces a scheme. */
+:where(.awr-chat, .awr-theme) {
   --awr-bg: #ffffff;
   --awr-fg: #1a1a1a;
   --awr-muted: #6b7280;
@@ -15,27 +18,19 @@
   --awr-accent-fg: #ffffff;
   --awr-assistant-bg: #f3f4f6;
   --awr-danger: #dc2626;
+  --awr-warn: #b45309;
   --awr-ok: #16a34a;
   --awr-radius: 12px;
   --awr-font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   --awr-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-  background: var(--awr-bg);
+  --awr-sidebar-width: 240px;
+  --awr-files-width: 300px;
   color: var(--awr-fg);
-  border: 1px solid var(--awr-border);
-  border-radius: var(--awr-radius);
   font-family: var(--awr-font);
-  font-size: 14px;
-  line-height: 1.5;
-  overflow: hidden;
 }
 
 @media (prefers-color-scheme: dark) {
-  .awr-chat {
+  :where(.awr-chat, .awr-theme):not([data-awr-theme='light']) {
     --awr-bg: #0f1115;
     --awr-fg: #e6e7ea;
     --awr-muted: #9aa1ab;
@@ -44,8 +39,128 @@
     --awr-accent: #6366f1;
     --awr-assistant-bg: #1a1e27;
     --awr-danger: #f87171;
+    --awr-warn: #fbbf24;
     --awr-ok: #4ade80;
   }
+}
+:where(.awr-chat, .awr-theme)[data-awr-theme='dark'] {
+  --awr-bg: #0f1115;
+  --awr-fg: #e6e7ea;
+  --awr-muted: #9aa1ab;
+  --awr-border: #262a33;
+  --awr-subtle: #171a21;
+  --awr-accent: #6366f1;
+  --awr-assistant-bg: #1a1e27;
+  --awr-danger: #f87171;
+  --awr-warn: #fbbf24;
+  --awr-ok: #4ade80;
+}
+
+/* ── Chat panel layout: [history] [main] [files] ──────────────────────────── */
+.awr-chat {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  background: var(--awr-bg);
+  border: 1px solid var(--awr-border);
+  border-radius: var(--awr-radius);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.awr-chat__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.awr-chat__sidebar,
+.awr-chat__files {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  background: var(--awr-subtle);
+}
+.awr-chat__sidebar {
+  width: var(--awr-sidebar-width);
+  border-right: 1px solid var(--awr-border);
+}
+.awr-chat__files {
+  width: var(--awr-files-width);
+  border-left: 1px solid var(--awr-border);
+}
+.awr-chat__closeside {
+  display: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 18px;
+  line-height: 1;
+}
+/* Narrow panels: the side panels overlay the chat instead of squeezing it. */
+.awr-chat--narrow > .awr-chat__sidebar,
+.awr-chat--narrow > .awr-chat__files {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  width: min(85%, 320px);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.awr-chat--narrow > .awr-chat__sidebar {
+  left: 0;
+}
+.awr-chat--narrow > .awr-chat__files {
+  right: 0;
+}
+.awr-chat--narrow .awr-chat__closeside {
+  display: inline-flex;
+}
+@container (max-width: 760px) {
+  .awr-chat__sidebar,
+  .awr-chat__files {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 5;
+    width: min(85%, 320px);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  }
+  .awr-chat__sidebar {
+    left: 0;
+  }
+  .awr-chat__files {
+    right: 0;
+  }
+  .awr-chat__closeside {
+    display: inline-flex;
+  }
+  .awr-status__text {
+    display: none;
+  }
+}
+.awr-chat__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--awr-border);
+  min-height: 44px;
+}
+.awr-chat__header .awr-chat__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .awr-chat__title {
@@ -202,10 +317,13 @@
 }
 
 .awr-tool {
+  font-size: 13px;
+  min-width: 0;
+}
+.awr-tool__row {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
   min-width: 0;
 }
 .awr-tool__icon {
@@ -287,8 +405,7 @@
   font-size: 13px;
 }
 .awr-chat__footer {
-  border-top: 1px solid var(--awr-border);
-  padding: 10px 12px;
+  padding: 8px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -427,6 +544,232 @@
   border-color: var(--awr-border, #e5e7eb);
 }
 
+/* ── Buttons (shared) ─────────────────────────────────────────────────────── */
+.awr-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--awr-border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--awr-bg, #fff);
+  color: var(--awr-fg, #1a1a1a);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.awr-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.awr-btn--primary {
+  background: var(--awr-accent, #4f46e5);
+  border-color: var(--awr-accent, #4f46e5);
+  color: var(--awr-accent-fg, #fff);
+}
+.awr-btn--danger {
+  color: var(--awr-danger, #dc2626);
+  border-color: color-mix(in srgb, var(--awr-danger, #dc2626) 50%, transparent);
+}
+.awr-btn--ghost {
+  background: transparent;
+  color: var(--awr-muted, #6b7280);
+}
+
+/* ── Tool consent ─────────────────────────────────────────────────────────── */
+.awr-approvals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.awr-approval {
+  border: 1px solid color-mix(in srgb, var(--awr-accent) 45%, var(--awr-border));
+  background: color-mix(in srgb, var(--awr-accent) 7%, var(--awr-bg));
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.awr-approval__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.awr-approval__icon {
+  color: var(--awr-accent);
+  flex: none;
+}
+.awr-approval__input {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--awr-subtle);
+  font-family: var(--awr-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.awr-approval__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.awr-tool--approval-approved .awr-tool__icon {
+  color: var(--awr-ok);
+}
+.awr-tool--approval-denied .awr-tool__icon,
+.awr-tool--approval-denied .awr-tool__args {
+  color: var(--awr-danger);
+}
+
+.awr-modeswitch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--awr-border, #e5e7eb);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+  background: var(--awr-subtle, #f6f7f9);
+}
+.awr-modeswitch__opt {
+  border: none;
+  background: transparent;
+  color: var(--awr-muted, #6b7280);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.awr-modeswitch__opt.is-active {
+  background: var(--awr-accent, #4f46e5);
+  color: var(--awr-accent-fg, #fff);
+}
+
+/* ── Thoughts, skills, subagents ──────────────────────────────────────────── */
+.awr-thought {
+  margin-left: 24px;
+  font-size: 13px;
+  color: var(--awr-muted);
+}
+.awr-activity > .awr-thought {
+  margin-left: 0;
+}
+.awr-thought > summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+.awr-thought__text {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  font-style: italic;
+  border-left: 2px solid var(--awr-border);
+  padding-left: 8px;
+}
+.awr-activity__skills {
+  font-size: 12px;
+  color: var(--awr-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.awr-chip {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--awr-border);
+  background: var(--awr-bg);
+  font-size: 12px;
+}
+.awr-subagents {
+  list-style: none;
+  margin: 2px 0 0 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.awr-subagent {
+  border: 1px dashed var(--awr-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+.awr-subagent__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.awr-subagent__icon {
+  color: var(--awr-accent);
+  flex: none;
+}
+.awr-subagent__name {
+  font-weight: 600;
+  flex: none;
+}
+.awr-subagent__task {
+  color: var(--awr-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.awr-subagent__activity {
+  color: var(--awr-muted);
+  font-size: 12px;
+  margin-left: 19px;
+}
+.awr-subagent--done .awr-subagent__icon {
+  color: var(--awr-ok);
+}
+.awr-subagent--error .awr-subagent__activity {
+  color: var(--awr-danger);
+}
+
+/* ── Context meter ────────────────────────────────────────────────────────── */
+.awr-context {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--awr-muted);
+}
+.awr-context__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--awr-mono);
+  font-variant-numeric: tabular-nums;
+}
+.awr-context__compact {
+  margin-left: auto;
+  font-family: var(--awr-font);
+  padding: 1px 8px;
+  font-size: 12px;
+}
+.awr-context__track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--awr-border);
+  overflow: hidden;
+}
+.awr-context__fill {
+  height: 100%;
+  background: var(--awr-accent);
+  transition: width 0.2s ease;
+}
+.awr-context__track.is-full .awr-context__fill {
+  background: var(--awr-danger);
+}
+.awr-context__note--warn {
+  color: var(--awr-danger);
+}
+
 /* ── Animations ───────────────────────────────────────────────────────────── */
 .awr-spin {
   animation: awr-rotate 0.9s linear infinite;
@@ -444,4 +787,488 @@
   50% {
     opacity: 0.35;
   }
+}
+
+/* ── Messages: activity, attachments, usage ───────────────────────────────── */
+.awr-msg__col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 85%;
+  min-width: 0;
+}
+.awr-msg--user .awr-msg__col {
+  align-items: flex-end;
+}
+.awr-msg--assistant .awr-msg__col {
+  align-items: flex-start;
+  max-width: 92%;
+}
+.awr-msg__col .awr-msg__bubble {
+  max-width: 100%;
+}
+.awr-msg--error .awr-msg__bubble {
+  border: 1px solid var(--awr-danger);
+  color: var(--awr-danger);
+}
+.awr-msg__col > .awr-activity {
+  align-self: stretch;
+}
+.awr-activity__summary {
+  cursor: pointer;
+  color: var(--awr-muted);
+  font-size: 12px;
+  user-select: none;
+}
+.awr-activity:not([open]) {
+  padding: 4px 10px;
+}
+.awr-msg__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.awr-msg--user .awr-msg__attachments {
+  justify-content: flex-end;
+}
+.awr-thumb {
+  display: block;
+  max-width: 160px;
+  max-height: 120px;
+  border-radius: 8px;
+  border: 1px solid var(--awr-border);
+  object-fit: cover;
+  background: var(--awr-subtle);
+}
+.awr-thumb--msg {
+  max-width: 240px;
+  max-height: 200px;
+}
+.awr-msg__usage {
+  font-size: 11px;
+  color: var(--awr-muted);
+  font-variant-numeric: tabular-nums;
+}
+.awr-tool__cost {
+  margin-left: auto;
+  flex: none;
+  color: var(--awr-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.awr-tool__images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 2px 19px;
+}
+.awr-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 240px;
+  padding: 2px 4px 2px 8px;
+}
+.awr-file__thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.awr-file__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Buttons shared by the composer and panels ────────────────────────────── */
+.awr-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--awr-muted);
+  cursor: pointer;
+}
+.awr-iconbtn:hover:not(:disabled),
+.awr-iconbtn.is-on {
+  background: var(--awr-subtle);
+  color: var(--awr-fg);
+}
+.awr-iconbtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.awr-file .awr-iconbtn {
+  width: 20px;
+  height: 20px;
+}
+
+/* ── Composer ─────────────────────────────────────────────────────────────── */
+.awr-composer2 {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--awr-border);
+  border-radius: 14px;
+  background: var(--awr-bg);
+  padding: 8px 8px 6px;
+}
+.awr-composer2:focus-within {
+  border-color: color-mix(in srgb, var(--awr-accent) 55%, var(--awr-border));
+}
+.awr-composer2.is-dragging {
+  border-style: dashed;
+  border-color: var(--awr-accent);
+}
+.awr-dropnote {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--awr-accent) 12%, var(--awr-bg));
+  color: var(--awr-accent);
+  font-weight: 600;
+  pointer-events: none;
+}
+.awr-composer2__inputrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.awr-composer2__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--awr-fg);
+  font: inherit;
+  padding: 4px 6px;
+  max-height: 200px;
+  field-sizing: content;
+  min-height: 2.6em;
+}
+.awr-composer2__interim {
+  font-size: 12px;
+  color: var(--awr-muted);
+  font-style: italic;
+  padding: 0 6px;
+}
+.awr-mic.is-on {
+  color: var(--awr-danger);
+  background: color-mix(in srgb, var(--awr-danger) 12%, transparent);
+  animation: awr-pulse 1.4s ease-in-out infinite;
+}
+@keyframes awr-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.awr-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 4px;
+}
+.awr-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.awr-toolbar__spacer {
+  flex: 1 1 auto;
+}
+.awr-tchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--awr-muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.awr-tchip--btn {
+  cursor: pointer;
+}
+.awr-tchip--btn:hover,
+.awr-tchip--btn[aria-expanded='true'] {
+  background: var(--awr-subtle);
+  color: var(--awr-fg);
+}
+.awr-tchip__sub {
+  color: var(--awr-muted);
+  margin-left: 2px;
+}
+.awr-tchip__sub::before {
+  content: '· ';
+}
+.awr-agents__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--awr-border);
+}
+.awr-agents.is-busy .awr-agents__dot {
+  background: var(--awr-ok);
+  animation: awr-pulse 1.2s ease-in-out infinite;
+}
+.awr-mode--autopilot {
+  color: var(--awr-accent);
+}
+.awr-mode--read-only {
+  color: var(--awr-ok);
+}
+.awr-mode--ask-writes,
+.awr-mode--ask-all {
+  color: var(--awr-warn);
+}
+.awr-popwrap {
+  position: relative;
+  display: inline-flex;
+}
+.awr-sendbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--awr-accent);
+  color: var(--awr-accent-fg);
+  cursor: pointer;
+  flex: none;
+}
+.awr-sendbtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.awr-sendbtn--stop {
+  background: var(--awr-fg);
+  color: var(--awr-bg);
+}
+
+/* Menus: the "/" palette and the chip popovers. */
+.awr-menu {
+  position: absolute;
+  z-index: 10;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 220px;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--awr-bg);
+  border: 1px solid var(--awr-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.16);
+}
+.awr-menu--commands {
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 6px);
+}
+.awr-menu--pop {
+  left: 0;
+  bottom: calc(100% + 6px);
+}
+.awr-menu--right {
+  left: auto;
+  right: 0;
+}
+.awr-menu__head {
+  padding: 6px 8px 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--awr-muted);
+}
+.awr-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--awr-fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+.awr-menu__item:hover,
+.awr-menu__item.is-active {
+  background: var(--awr-subtle);
+}
+.awr-menu__item code {
+  font-family: var(--awr-mono);
+}
+.awr-menu__desc {
+  color: var(--awr-muted);
+  font-size: 12px;
+  flex: 1 1 140px;
+}
+.awr-menu__group {
+  margin-left: auto;
+  color: var(--awr-muted);
+  font-size: 11px;
+}
+
+/* Banners above the input. */
+.awr-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.awr-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--awr-subtle);
+  color: var(--awr-fg);
+}
+.awr-notice > span {
+  flex: 1 1 auto;
+}
+.awr-notice--warn {
+  background: color-mix(in srgb, var(--awr-warn) 14%, transparent);
+}
+.awr-notice--error {
+  background: color-mix(in srgb, var(--awr-danger) 12%, transparent);
+  color: var(--awr-danger);
+}
+.awr-notice .awr-iconbtn {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Side panels: history + files ─────────────────────────────────────────── */
+.awr-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 6px;
+}
+.awr-panel__title {
+  flex: 1 1 auto;
+  font-weight: 600;
+  font-size: 13px;
+}
+.awr-panel__empty {
+  padding: 8px 12px;
+  color: var(--awr-muted);
+  font-size: 12px;
+}
+.awr-history__new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 28px;
+}
+.awr-history__list,
+.awr-filelist {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.awr-history__item,
+.awr-filelist__item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 8px;
+}
+.awr-history__item:hover,
+.awr-filelist__item:hover,
+.awr-history__item.is-active,
+.awr-filelist__item.is-active {
+  background: var(--awr-bg);
+}
+.awr-history__open,
+.awr-filelist__open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  border: 0;
+  background: transparent;
+  color: var(--awr-fg);
+  font: inherit;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.awr-history__open {
+  flex-direction: column;
+}
+.awr-history__open:disabled {
+  cursor: default;
+}
+.awr-history__title,
+.awr-filelist__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.awr-history__meta,
+.awr-filelist__size {
+  font-size: 11px;
+  color: var(--awr-muted);
+}
+.awr-filelist__open {
+  align-items: center;
+  gap: 6px;
+}
+.awr-filelist__path {
+  flex: 1 1 auto;
+  font-family: var(--awr-mono);
+  font-size: 12px;
+}
+.awr-filepreview {
+  margin: 0 8px 8px;
+  border: 1px solid var(--awr-border);
+  border-radius: 8px;
+  background: var(--awr-bg);
+  overflow: auto;
+  max-height: 50%;
+}
+.awr-filepreview img {
+  display: block;
+  max-width: 100%;
+}
+.awr-filepreview pre {
+  margin: 0;
+  padding: 8px;
+  font-family: var(--awr-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

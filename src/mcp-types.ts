@@ -15,6 +15,8 @@ export interface McpCatalogEntry {
   name: string
   description: string
   server: string
+  /** The server marked the tool read-only (newer cores). */
+  readOnly?: boolean
 }
 
 export interface McpServerResult {
@@ -36,6 +38,8 @@ export interface McpHttpServerConfig {
   url: string
   headers?: Record<string, string>
   authProvider?: unknown
+  /** Per-server connect deadline (newer cores; ignored by older ones). */
+  connectTimeoutMs?: number
 }
 
 export interface McpOAuthCallback {
@@ -63,7 +67,11 @@ export interface BrowserOAuthProviderOptions {
 export interface McpModule {
   connectMcpHttp: (
     servers: Record<string, McpHttpServerConfig>,
-    opts?: { clientName?: string; onLog?: (level: string, message: string) => void },
+    opts?: {
+      clientName?: string
+      onLog?: (level: string, message: string) => void
+      connectTimeoutMs?: number
+    },
   ) => Promise<ConnectedMcp>
   BrowserOAuthProvider?: new (opts: BrowserOAuthProviderOptions) => BrowserOAuthProvider
   readOAuthCallback?: (input?: string | URL) => McpOAuthCallback | undefined

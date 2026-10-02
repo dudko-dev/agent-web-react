@@ -30,19 +30,32 @@ The repo also contains a **Vite demo** (`demo/`) that is auto-deployed to
 - `src/state.ts` — the pure `agentStateReducer` + `createInitialAgentState`.
 - `src/types.ts` — `AgentUiState`, `ChatMessage`, `StepView`, `ToolCallView`, …
 - `src/hooks/` — `use-agent` (the hook), `use-credentials` (vault),
-  `use-webllm-model`, `use-mcp` (remote MCP + OAuth round-trip).
+  `use-webllm-model`, `use-mcp` (remote MCP + OAuth round-trip),
+  `use-mcp-servers` (several servers), `use-chat-history`, `use-virtual-files`,
+  `use-speech-to-text`.
+- `src/chat-history.ts` — `ChatHistoryStore` (raw IndexedDB, memory fallback).
+- `src/composer.ts` — the composer's pure helpers (slash commands, attachment
+  kinds/refusals, notices); `src/image-resize.ts` — `downscaleImage`.
+- `src/labels.tsx` — every UI string (`defaultLabels`, `AgentLabelsProvider`,
+  `useLabels`); components take `labels` overrides.
 - `src/mcp-types.ts` — structural types for the core's optional `./mcp` subpath,
   which `use-mcp` loads with a dynamic import (never a static one).
 - `src/context.tsx` — `AgentProvider` + `useAgentContext`.
-- `src/components/` — `AgentChat`, `MessageList`, `Composer`, `PlanView`,
-  `StepList`, `ModelLoadBar`, `UsageBadge`, `ApiKeyForm`, `icons`, `format`.
+- `src/components/` — `AgentChat` (panel: history sidebar, transcript,
+  composer, files panel; slots / render props / components / theme),
+  `AgentComposer`, `MessageList`, `StepList` (+ `ToolCallRow`),
+  `ToolApprovalPrompt`, `ApprovalModeSwitch`, `ChatHistoryList`, `FilesPanel`,
+  `ContextMeter`, `Composer` (minimal), `PlanView`, `ModelLoadBar`,
+  `UsageBadge`, `ApiKeyForm`, `icons`, `format`. Docs: `docs/chat.md`.
 - `demo/src/components/McpPanel.tsx` — the demo's "bring your own MCP" panel.
 - `src/styles.css` — optional theme (light + dark).
 - `src/index.ts` — public surface (+ curated re-exports from the core).
-- `tests/state.test.ts` — `node --test` over the reducer (imports from `dist`).
-- `e2e/` — Playwright over the built demo: the OAuth redirect round-trip,
-  IndexedDB reuse, CORS. `servers.ts` starts a real MCP server + authorization
-  server on loopback.
+- `tests/state.test.ts`, `tests/chat.test.ts` — `node --test` over the reducer,
+  composer helpers, labels and the history store (imports from `dist`).
+- `e2e/` — Playwright over the built demo: MCP (several servers, the OAuth
+  redirect round-trip, IndexedDB reuse, CORS — `servers.ts` starts a real MCP
+  server + authorization server on loopback) and the agent end to end against
+  a scripted Gemini endpoint (`gemini.ts`, routed by the stage markers).
 - `demo/` — the Vite + React demo (aliases the library to `../dist`).
 
 ## Commands
@@ -75,5 +88,8 @@ publishes to npm via Trusted Publishing after CI passes on `main`. Pages
   build the library before building the demo.
 - Keep the event→UI logic in the reducer, not the components. New event fields
   from the core map to new `AgentUiState` fields + a reducer case + a test.
+- Every user-visible string goes through `labels` (add it to `AgentLabels` and
+  `defaultLabels`); every new part of a component gets a `show*` prop or a
+  render prop / slot — hosts must be able to hide, relabel or replace it.
 - Don't import model providers, `ai`, or `zod` at runtime here — the core owns
   them. Type-only imports from `@dudko.dev/agent-web` are fine.

@@ -67,7 +67,14 @@ test('a full run folds into plan, steps, tool calls, usage and a final answer', 
     phase: 'synthesize',
     usage: { inputTokens: 2, outputTokens: 3, totalTokens: 5 },
   })
-  assert.deepEqual(s.usage, { inputTokens: 12, outputTokens: 8, totalTokens: 20 })
+  assert.deepEqual(s.usage, {
+    inputTokens: 12,
+    outputTokens: 8,
+    totalTokens: 20,
+    reasoningTokens: 0,
+    cachedInputTokens: 0,
+    cacheWriteTokens: 0,
+  })
 
   s = event(s, { type: 'final.text-delta', delta: 'Done' })
   s = event(s, { type: 'final.text-delta', delta: '!' })
@@ -136,4 +143,129 @@ test('reset clears the run and the transcript but preserves status', () => {
   s = agentStateReducer(s, { type: 'reset' })
   assert.equal(s.messages.length, 0)
   assert.equal(s.status, 'ready')
+})
+
+test('thoughts stream into their step and the answer; usage keeps thinking and cache tokens', () => {
+  let s = event(createInitialAgentState(), { type: 'run.start', goal: 'x' })
+  s = event(s, { type: 'step.start', step, index: 1, total: 1 })
+  s = event(s, { type: 'step.reasoning-delta', step, delta: 'hmm, ' })
+  s = event(s, { type: 'step.reasoning-delta', step, delta: 'notes' })
+  s = event(s, { type: 'final.reasoning-delta', delta: 'summing up' })
+  s = event(s, {
+    type: 'usage',
+    phase: 'execute',
+    usage: {
+      inputTokens: 10,
+      outputTokens: 6,
+      totalTokens: 16,
+      reasoningTokens: 4,
+      cachedInputTokens: 7,
+    },
+  })
+  assert.equal(s.steps[0].reasoning, 'hmm, notes')
+  assert.equal(s.finalReasoning, 'summing up')
+  assert.equal(s.usage.reasoningTokens, 4)
+  assert.equal(s.usage.cachedInputTokens, 7)
+})
+
+test('consent requests are tracked until resolved; policy denials are recorded too', () => {
+  let s = event(createInitialAgentState(), { type: 'run.start', goal: 'x' })
+  s = event(s, { type: 'step.start', step, index: 1, total: 1 })
+  s = event(s, {
+    type: 'tool.approval-requested',
+    id: 'a1',
+    name: 'add_note',
+    input: { text: 'hi' },
+    readOnly: false,
+    step,
+  })
+  assert.equal(s.approvals.length, 1)
+  assert.equal(s.approvals[0].status, 'pending')
+  assert.equal(s.approvals[0].stepId, 's1')
+  s = event(s, {
+    type: 'tool.approval-resolved',
+    id: 'a1',
+    name: 'add_note',
+    approved: true,
+    automatic: false,
+  })
+  assert.equal(s.approvals[0].status, 'approved')
+  // A read-only-mode refusal arrives without a request.
+  s = event(s, {
+    type: 'tool.approval-resolved',
+    id: 'a2',
+    name: 'delete_all',
+    approved: false,
+    reason: 'the agent is in read-only mode',
+    automatic: true,
+  })
+  assert.deepEqual(
+    s.approvals.map((a) => [a.id, a.status, a.automatic]),
+    [
+      ['a1', 'approved', false],
+      ['a2', 'denied', true],
+    ],
+  )
+  assert.equal(s.approvals[1].stepId, 's1')
+})
+
+test('stopping a run denies whatever was still waiting for consent', () => {
+  let s = event(createInitialAgentState(), { type: 'run.start', goal: 'x' })
+  s = event(s, { type: 'tool.approval-requested', id: 'a1', name: 't', input: {}, readOnly: false })
+  s = event(s, { type: 'stopped' })
+  assert.equal(s.approvals[0].status, 'denied')
+})
+
+test('subagents are folded from their own nested events', () => {
+  let s = event(createInitialAgentState(), { type: 'run.start', goal: 'x' })
+  s = event(s, { type: 'step.start', step, index: 1, total: 1 })
+  s = event(s, { type: 'subagent.start', id: 'sa1', name: 'analyst', task: 'look at e4' })
+  const inner = { id: 'c1', description: 'Search' }
+  s = event(s, {
+    type: 'subagent.event',
+    id: 'sa1',
+    name: 'analyst',
+    event: { type: 'step.start', step: inner, index: 1, total: 2 },
+  })
+  s = event(s, {
+    type: 'subagent.event',
+    id: 'sa1',
+    name: 'analyst',
+    event: { type: 'step.tool-call', step: inner, name: 'engine', input: {} },
+  })
+  assert.equal(s.subagents[0].stepId, 's1')
+  assert.equal(s.subagents[0].steps, 1)
+  assert.equal(s.subagents[0].toolCalls, 1)
+  assert.equal(s.subagents[0].activity, '→ engine')
+  s = event(s, {
+    type: 'subagent.complete',
+    id: 'sa1',
+    name: 'analyst',
+    text: 'e4 is best',
+    usage: { inputTokens: 3, outputTokens: 2, totalTokens: 5 },
+  })
+  assert.equal(s.subagents[0].status, 'done')
+  assert.equal(s.subagents[0].text, 'e4 is best')
+  s = event(s, { type: 'subagent.start', id: 'sa2', name: 'analyst', task: 'd4' })
+  s = event(s, { type: 'subagent.error', id: 'sa2', name: 'analyst', error: 'timed out' })
+  assert.equal(s.subagents[1].status, 'error')
+  assert.equal(s.subagents[1].error, 'timed out')
+})
+
+test('skills, discovered tools, compactions and budget stops are recorded per run', () => {
+  let s = event(createInitialAgentState(), { type: 'run.start', goal: 'x' })
+  s = event(s, { type: 'skill.activated', name: 'tone', by: 'plan' })
+  s = event(s, { type: 'skill.activated', name: 'tone', by: 'tool' })
+  s = event(s, { type: 'tools.discovered', query: 'q', names: ['a__b', 'a__c'] })
+  s = event(s, { type: 'tools.discovered', query: 'q2', names: ['a__c', 'a__d'] })
+  s = event(s, { type: 'context.compacted', scope: 'trace', beforeTokens: 900, afterTokens: 200 })
+  s = event(s, { type: 'budget.exceeded', kind: 'total', tokens: 1200, cap: 1000 })
+  assert.deepEqual(s.skills, ['tone'])
+  assert.deepEqual(s.discoveredTools, ['a__b', 'a__c', 'a__d'])
+  assert.deepEqual(s.compactions, [{ scope: 'trace', beforeTokens: 900, afterTokens: 200 }])
+  assert.deepEqual(s.budget, { kind: 'total', tokens: 1200, cap: 1000 })
+  // A new run starts clean.
+  s = event(s, { type: 'run.start', goal: 'y' })
+  assert.deepEqual(s.skills, [])
+  assert.equal(s.budget, undefined)
 })
