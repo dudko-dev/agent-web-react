@@ -4,7 +4,8 @@ import { BUILTIN_SKILLS, SKILL_TABS } from './skills'
 
 export type View = 'notes' | 'mcp' | 'chess'
 
-export type ThinkingChoice = 'off' | 'low' | 'medium' | 'high'
+/** 'off' leaves the provider default (a local Qwen3 thinks); 'none' turns it off. */
+export type ThinkingChoice = 'off' | 'none' | 'low' | 'medium' | 'high'
 export type AnalystMode = 'off' | 'worker' | 'in-process'
 
 /** Everything the "Agent settings" panel controls, shared by every tab. */

@@ -223,6 +223,12 @@ function LocalAgent() {
 > not silently on the first message) and `ready` flips only once the model can
 > actually answer. The `create` option is what makes it work under a bundler —
 > see below.
+>
+> Change the `modelId` and everything the hook reports — `model`, `ready`,
+> `loading`, `progress`, `error` — is about the new one, which is not loaded
+> yet. The previous model stays in memory (`loadedModelId`; switching back is
+> instant) until the new one is loaded — that frees it first, so two models
+> never share the GPU — or until `unload()`.
 
 ## Models in a bundler (Vite, Next, CRA)
 

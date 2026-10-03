@@ -76,7 +76,8 @@ export interface AgentLabels {
     readOnly: string
     think: (levels: string) => string
   }
-  thinkingLevels: { off: string; low: string; medium: string; high: string }
+  /** `off` = the provider's default; `none` = thinking switched off. */
+  thinkingLevels: { off: string; none: string; low: string; medium: string; high: string }
 
   // ── files panel ────────────────────────────────────────────────────────────
   filesEmpty: string
@@ -195,7 +196,13 @@ export const defaultLabels: AgentLabels = {
     readOnly: 'Only read; refuse changes',
     think: (levels) => `Set thinking: ${levels}`,
   },
-  thinkingLevels: { off: 'Default', low: 'Low', medium: 'Medium', high: 'High' },
+  thinkingLevels: {
+    off: 'Default',
+    none: 'No thinking',
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+  },
 
   filesEmpty: 'No files yet. Attachments and files the agent writes appear here.',
   upload: 'Upload',

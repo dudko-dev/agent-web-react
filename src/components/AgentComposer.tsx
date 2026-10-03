@@ -133,6 +133,7 @@ export interface AgentComposerProps {
 
 const thinkingDefaults = (l: AgentLabels) => [
   { id: 'off', label: l.thinkingLevels.off },
+  { id: 'none', label: l.thinkingLevels.none },
   { id: 'low', label: l.thinkingLevels.low },
   { id: 'medium', label: l.thinkingLevels.medium },
   { id: 'high', label: l.thinkingLevels.high },

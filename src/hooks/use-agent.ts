@@ -164,6 +164,16 @@ export const useAgent = (
 
   const reload = useCallback(() => setGeneration((g) => g + 1), [])
 
+  // The build's own status. A rebuild while a run is in flight (a setting
+  // changed mid-run) must not flip the UI out of 'running': the run keeps the
+  // agent it started with, and the new one takes the next run.
+  type BuildStatus = { status: 'idle' | 'initializing' | 'ready' | 'error'; error?: string }
+  const buildStatusRef = useRef<BuildStatus>({ status: 'idle' })
+  const setBuildStatus = useCallback((next: BuildStatus) => {
+    buildStatusRef.current = next
+    if (!abortRef.current) dispatch({ type: 'status', ...next })
+  }, [])
+
   // Build (and rebuild) the agent. Model resolution is async (dynamic provider
   // imports, vault key fetch, WebLLM weight download), so this lives in effect.
   const { autoStart, deps } = options
@@ -176,7 +186,7 @@ export const useAgent = (
     // undefined), in which case we sit idle rather than build a broken agent.
     const shouldBuild = (autoStart !== false || generation > 0) && Boolean(cfg.model)
     if (!shouldBuild) {
-      dispatch({ type: 'status', status: 'idle' })
+      setBuildStatus({ status: 'idle' })
       return
     }
     // Consent requests come to the hook unless the host handles them itself.
@@ -188,17 +198,17 @@ export const useAgent = (
         }
       : cfg
     let cancelled = false
-    dispatch({ type: 'status', status: 'initializing' })
+    setBuildStatus({ status: 'initializing' })
     createAgent(built)
       .then((agent) => {
         if (cancelled) return
         agent.setToolApprovalMode(modeRef.current)
         agentRef.current = agent
-        dispatch({ type: 'status', status: 'ready' })
+        setBuildStatus({ status: 'ready' })
       })
       .catch((err) => {
         if (cancelled) return
-        dispatch({ type: 'status', status: 'error', error: errMessage(err) })
+        setBuildStatus({ status: 'error', error: errMessage(err) })
       })
     return () => {
       cancelled = true
@@ -259,7 +269,8 @@ export const useAgent = (
       } finally {
         abortRef.current = undefined
         settleAll({ approved: false, reason: 'the run ended' })
-        dispatch({ type: 'status', status: 'ready' })
+        // Whatever the agent did meanwhile: rebuilt, still building, or gone.
+        dispatch({ type: 'status', ...buildStatusRef.current })
       }
     },
     [settleAll],

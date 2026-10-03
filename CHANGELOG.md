@@ -1,3 +1,12 @@
+# 0.0.12 / 2026-10-03
+
+### :tada: Enhancements
+- `useWebLLMModel` follows the current model id: switching models shows the new one as not loaded (it used to keep reporting the old one as ready); the previous model stays in memory until the next load frees it first; new `unload()` and `loadedModelId`
+- `useAgent`: a setting changed mid-run no longer flips the panel out of "running"; the next run uses the new agent
+- "No thinking" (`none`) thinking level in the composer chip and labels
+- Demo: chess endings decided by the rules (a mating move is never answered by the agent; the result covers the board and closes the chat), a failed agent turn shown with its reason and the board locked until it moves (Retry / Engine move); the model card names the model in GPU memory and can unload it
+- Updated dependencies: @dudko.dev/agent-web 0.0.21 (WebLLM thinking switch)
+
 # 0.0.11 / 2026-10-03
 
 ### :tada: Enhancements

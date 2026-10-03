@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Square } from 'chess.js'
 import type { BrowserAgentConfig, ModelInput } from '@dudko.dev/agent-web'
 import {
@@ -18,7 +18,7 @@ import {
 import type { LanguageModel } from 'ai'
 import { ANALYST_PROMPT, engineTools } from './chess/analyst-tools'
 import { ChessPanel } from './chess/ChessPanel'
-import { useChessGame } from './chess/game'
+import { outcomeText, useChessGame } from './chess/game'
 import { AgentSettingsPanel } from './components/AgentSettingsPanel'
 import { McpPanel } from './components/McpPanel'
 import { NotesBoard } from './components/NotesBoard'
@@ -190,6 +190,8 @@ export const App = () => {
 
   // ── Tab 3: chess against the agent, with analyst subagents ─────────────────
   const game = useChessGame()
+  // The last step error of the agent's turn (see playAgentTurn).
+  const chessErrorRef = useRef<string | undefined>(undefined)
   const workerAnalystsBlocked = settings.analysts === 'worker' && local
   const analysts = useMemo<AgentToolSet>(() => {
     if (settings.analysts === 'off' || !resolvedModel) return {} as AgentToolSet
@@ -252,22 +254,59 @@ export const App = () => {
       maxPlanSteps: 1,
       replan: false,
     },
-    { deps: [...deps, analysts, skillsByTab.chess] },
+    {
+      deps: [...deps, analysts, skillsByTab.chess],
+      // A step error (quota, network) doesn't end the run; keep it for the board.
+      onEvent: (e) => {
+        if (e.type === 'error') chessErrorRef.current = e.error
+      },
+    },
   )
 
+  // Whether the agent moved is read off the board, never off its words: a turn
+  // that ends with Black still to move is a failed turn, and the board stays
+  // locked until it does move (Retry, or the engine).
+  const [chessIssue, setChessIssue] = useState<string | undefined>()
   const chessRun = chessAgent.run
+  const { current: chessNow, agentColor } = game
+  const playAgentTurn = useCallback(
+    async (goal: string) => {
+      setChessIssue(undefined)
+      chessErrorRef.current = undefined
+      const result = await chessRun(goal)
+      const now = chessNow()
+      if (now.outcome || now.turn !== agentColor) return // it moved
+      const error = chessErrorRef.current
+      setChessIssue(
+        result === undefined && !error
+          ? 'The agent could not start its turn (still loading, or busy).'
+          : result?.stopped
+            ? 'The agent’s turn was stopped before it moved.'
+            : result?.budgetExceeded
+              ? `The agent hit its ${result.budgetExceeded.kind} limit before moving.`
+              : error
+                ? `The agent failed: ${error}`
+                : 'The agent ended its turn without making a move.',
+      )
+    },
+    [chessRun, chessNow, agentColor],
+  )
   const onUserMove = useCallback(
     (from: Square, to: Square) => {
       const san = game.userMove(from, to)
       if (!san) return
+      // The rules decide the end: a mating (or drawing) move ends the game here,
+      // and the agent isn't asked to play on.
+      if (game.current().outcome) return
       // The move IS the trigger: no chat message, the agent just answers it.
-      void chessRun(`White played ${san}. Your move.`)
+      void playAgentTurn(`White played ${san}. Your move.`)
     },
-    [game, chessRun],
+    [game, playAgentTurn],
   )
   const onNewGame = () => {
     game.newGame()
     chessAgent.reset()
+    setChessIssue(undefined)
   }
 
   // ── Routing & one-model-at-a-time ──────────────────────────────────────────
@@ -430,6 +469,18 @@ export const App = () => {
                 composer={composer('Chat with your opponent — or just make a move on the board')}
                 {...chatCommon}
                 files={undefined}
+                // The game's own verdict, after whatever the model said.
+                slots={{
+                  afterMessages: game.outcome ? (
+                    <div className="chess-note chess-note--result" role="status">
+                      🏁 {outcomeText(game.outcome)}
+                    </div>
+                  ) : chessIssue && !chessAgent.isRunning ? (
+                    <div className="chess-note chess-note--issue" role="alert">
+                      ⚠ {chessIssue} The board waits for its move — Retry or Engine move.
+                    </div>
+                  ) : undefined,
+                }}
               />
             )}
           </div>
@@ -462,8 +513,11 @@ export const App = () => {
               }
               onAnalysts={(analysts) => update({ analysts })}
               onUserMove={onUserMove}
-              onAskAgent={() => void chessRun("It's your move.")}
-              onEngineMove={() => void game.engineMove()}
+              agentIssue={chessIssue}
+              onAskAgent={() => void playAgentTurn("It's your move.")}
+              onEngineMove={() => {
+                if (game.engineMove()) setChessIssue(undefined)
+              }}
               onNewGame={onNewGame}
             />
           )}

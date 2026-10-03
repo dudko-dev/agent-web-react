@@ -120,6 +120,7 @@ export const AgentSettingsPanel = ({
             onChange={(e) => update({ thinking: e.target.value as ThinkingChoice })}
           >
             <option value="off">default</option>
+            <option value="none">none</option>
             <option value="low">low</option>
             <option value="medium">medium</option>
             <option value="high">high</option>

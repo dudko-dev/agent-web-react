@@ -1,13 +1,15 @@
 import type { Square } from 'chess.js'
 import type { AnalystMode } from '../settings'
 import { ChessBoard } from './ChessBoard'
-import type { ChessGame } from './game'
+import { outcomeText, type ChessGame } from './game'
 
 export interface ChessPanelProps {
   game: ChessGame
   /** The agent is thinking about / playing its move. */
   agentBusy: boolean
   agentReady: boolean
+  /** Why the agent's last turn ended without a move (an error, a refusal, a stop). */
+  agentIssue?: string
   analysts: AnalystMode
   /** Why worker analysts are unavailable (e.g. a local model), if they are. */
   analystsNote?: string
@@ -20,21 +22,20 @@ export interface ChessPanelProps {
   onNewGame: () => void
 }
 
-const RESULT: Record<string, string> = {
-  checkmate: 'Checkmate',
-  stalemate: 'Stalemate',
-  draw: 'Draw',
-}
-
 /**
  * The board, the move list and the controls. Every user move TRIGGERS the
  * agent: the app calls `agent.run("White played …")`, and the agent answers by
  * calling `make_move` — no chat message needed.
+ *
+ * Nothing here trusts the model's words: the game ends when the rules say so
+ * (the result covers the board), and a turn the agent ended without moving is
+ * shown as such — the board stays locked until it moves (retry, or the engine).
  */
 export const ChessPanel = ({
   game,
   agentBusy,
   agentReady,
+  agentIssue,
   analysts,
   analystsNote,
   onAnalysts,
@@ -43,7 +44,7 @@ export const ChessPanel = ({
   onEngineMove,
   onNewGame,
 }: ChessPanelProps) => {
-  const over = game.status !== 'playing'
+  const over = game.outcome !== undefined
   const agentTurn = game.turn === game.agentColor && !over
   const pairs: string[] = []
   for (let i = 0; i < game.history.length; i += 2) {
@@ -55,24 +56,21 @@ export const ChessPanel = ({
   return (
     <div className="chess">
       <div className="chess__status">
-        {over ? (
-          <strong>
-            {RESULT[game.status]}
-            {game.winner ? ` — ${game.winner === 'w' ? 'you win' : 'the agent wins'}` : ''}
-          </strong>
+        {game.outcome ? (
+          <strong>{outcomeText(game.outcome)}</strong>
         ) : agentTurn ? (
           agentBusy ? (
             <span className="chess__thinking">The agent is choosing its move…</span>
           ) : (
-            <span className="chess__agent-turn">
-              Agent to move.
+            <span className={`chess__agent-turn${agentIssue ? ' chess__agent-turn--issue' : ''}`}>
+              {agentIssue ? <span role="alert">⚠ {agentIssue}</span> : 'Agent to move.'}
               <button
                 type="button"
                 className="mcp__btn-ghost"
                 onClick={onAskAgent}
                 disabled={!agentReady}
               >
-                Ask it to move
+                {agentIssue ? 'Retry' : 'Ask it to move'}
               </button>
               <button type="button" className="mcp__btn-ghost" onClick={onEngineMove}>
                 Engine move
@@ -84,7 +82,21 @@ export const ChessPanel = ({
         )}
       </div>
 
-      <ChessBoard game={game} interactive={!agentTurn && !over && !agentBusy} onMove={onUserMove} />
+      <ChessBoard
+        game={game}
+        interactive={!agentTurn && !over && !agentBusy}
+        onMove={onUserMove}
+        overlay={
+          game.outcome && (
+            <div className="cboard__result" role="status">
+              <strong>{outcomeText(game.outcome)}</strong>
+              <button type="button" className="settings__btn" onClick={onNewGame}>
+                New game
+              </button>
+            </div>
+          )
+        }
+      />
 
       <div className="chess__controls">
         <button type="button" className="settings__btn" onClick={onNewGame} disabled={agentBusy}>

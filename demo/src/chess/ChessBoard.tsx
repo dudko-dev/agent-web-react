@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Square } from 'chess.js'
 import type { ChessGame } from './game'
 
@@ -24,10 +24,12 @@ export interface ChessBoardProps {
   /** The user can move (their turn, agent idle). */
   interactive: boolean
   onMove: (from: Square, to: Square) => void
+  /** Covers the board (the game result). */
+  overlay?: ReactNode
 }
 
 /** A click-to-move board, White at the bottom. Click a piece, then a highlighted square. */
-export const ChessBoard = ({ game, interactive, onMove }: ChessBoardProps) => {
+export const ChessBoard = ({ game, interactive, onMove, overlay }: ChessBoardProps) => {
   const [selected, setSelected] = useState<Square | undefined>()
   const targets = selected ? new Set(game.targets(selected)) : new Set<Square>()
 
@@ -81,6 +83,7 @@ export const ChessBoard = ({ game, interactive, onMove }: ChessBoardProps) => {
           )
         }),
       )}
+      {overlay}
     </div>
   )
 }

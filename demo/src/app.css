@@ -276,6 +276,12 @@ a {
   color: #16a34a;
   font-size: 13px;
 }
+.settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 
 /* ── Board ────────────────────────────────────────────────────────────────── */
 .board {
@@ -803,6 +809,7 @@ a {
   overflow: hidden;
   border: 1px solid var(--border);
   user-select: none;
+  position: relative;
 }
 .cboard__sq {
   position: relative;
@@ -888,6 +895,46 @@ a {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+.chess__agent-turn--issue > [role='alert'] {
+  color: #b45309;
+}
+/* The game's verdict in the chat, after the model's last words. */
+/* Inside the chat, so it follows the chat's theme tokens (light / dark). */
+.chess-note {
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--awr-fg);
+  border: 1px solid var(--awr-border);
+  background: var(--awr-subtle);
+}
+.chess-note--result {
+  border-color: var(--awr-accent);
+  font-weight: 600;
+}
+.chess-note--issue {
+  border-color: var(--awr-warn);
+}
+/* The game result covers the board: the rules decided it, the board is done. */
+.cboard__result {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  font-size: clamp(16px, 4.5cqi, 26px);
+  backdrop-filter: blur(1px);
+}
+.cboard__result .settings__btn {
+  font-size: 15px;
 }
 .agentset__peek {
   font-weight: 400;
