@@ -1,3 +1,8 @@
+# 0.0.11 / 2026-10-03
+
+### :tada: Enhancements
+- Updated dependencies: @modelcontextprotocol/sdk
+
 # 0.0.9 / 2026-09-26
 
 ### :tada: Enhancements
