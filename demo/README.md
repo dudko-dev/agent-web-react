@@ -25,11 +25,15 @@ Three tabs, sharing one "Agent settings" panel:
 - **Chess vs agent** — you play White; **your move is the trigger**: the agent
   reads the position with `get_position`, weighs candidates (`evaluate_moves`,
   or analyst **subagents** — each in its own **Web Worker**, or in-process),
-  and plays with `make_move`. No chat message needed.
+  and plays with `make_move`. No chat message needed. The rules, not the
+  model, decide the outcome: a mate, stalemate or draw ends the game on the
+  spot (a mating move is never answered), and a turn the agent ends without
+  moving — an API error, a spent quota, a stop — is shown as such, with the
+  board locked until it moves (Retry, or the built-in engine).
 
 The **Agent settings** panel drives the core's features live: tool consent
 (⚡ autopilot / ask before changes / ask everything / read-only), thinking
-level, token / tool-call / step limits, context window and auto-compaction,
+level ("none" turns a local Qwen's thinking off), token / tool-call / step limits, context window and auto-compaction,
 skills (each tab lists its own built-in examples; your own or imported
 `SKILL.md` ones apply to every tab), the chess analysts — and the **chat UI**: tool calls, token usage, saved chats
 (IndexedDB), the files panel, theme, and the labels (English / Russian — every
@@ -39,6 +43,11 @@ The chat itself shows every tool call with its cost, tokens by kind per answer
 and in total, thoughts, subagents and consent prompts; the composer has
 attachments, "/" commands, a run timer, the running-agents count, the model +
 thinking chip, the consent chip and a speech-to-text mic.
+
+Local models: pick one and press "Download & load". Switching to another one
+shows it as not loaded (the loaded one stays in memory, so switching back is
+instant); loading it frees the previous model's GPU memory first, and
+"Unload" frees it on demand.
 
 **Live:** https://dudko-dev.github.io/agent-web-react/
 

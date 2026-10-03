@@ -16,11 +16,20 @@ export interface GeminiCall {
   functionResponses: { name: string; response: unknown }[]
   /** Inline files sent (images, PDFs). */
   inlineData: { mimeType: string; bytes: number }[]
+  /** generationConfig.thinkingConfig.thinkingLevel, when the call asked for thinking. */
+  thinkingLevel?: string
   streaming: boolean
 }
 
-export type GeminiReply =
-  { text: string } | { call: { name: string; args: Record<string, unknown> } }
+export type GeminiReply = (
+  | { text: string }
+  | { call: { name: string; args: Record<string, unknown> } }
+  /** An HTTP error from the API (e.g. 429 when the quota is spent). */
+  | { error: { status: number; message: string } }
+) & {
+  /** Hold the answer this long (a slow model, to act mid-run). */
+  delayMs?: number
+}
 
 type Part = {
   text?: string
@@ -31,6 +40,7 @@ type Part = {
 type Body = {
   systemInstruction?: { parts?: Part[] }
   contents?: { role: string; parts?: Part[] }[]
+  generationConfig?: { thinkingConfig?: { thinkingLevel?: string } }
 }
 
 const stageOf = (system: string): GeminiCall['stage'] => {
@@ -74,10 +84,22 @@ export const mockGemini = async (
       inlineData: parts
         .filter((p) => p.inlineData)
         .map((p) => ({ mimeType: p.inlineData!.mimeType, bytes: p.inlineData!.data.length })),
+      thinkingLevel: body.generationConfig?.thinkingConfig?.thinkingLevel,
       streaming: req.url().includes(':streamGenerateContent'),
     }
     calls.push(call)
     const reply = script(call)
+    if (reply.delayMs) await new Promise((r) => setTimeout(r, reply.delayMs))
+    if ('error' in reply) {
+      await route.fulfill({
+        status: reply.error.status,
+        headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+        body: JSON.stringify({
+          error: { code: reply.error.status, message: reply.error.message, status: 'ERROR' },
+        }),
+      })
+      return
+    }
     const candidate = {
       content: {
         role: 'model',

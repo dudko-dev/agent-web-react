@@ -154,6 +154,106 @@ test('chess: the user’s move triggers the agent, which answers with its own', 
   await expect(page.getByRole('button', { name: 'e5 black p' })).toBeVisible()
 })
 
+/** Black answers the user's moves with these, one per turn. */
+const blackPlays = (moves: string[]) => {
+  let next = 0
+  return (c: GeminiCall): GeminiReply => {
+    if (c.stage === 'planner') return plan('Answer the move')
+    if (c.stage === 'executor') {
+      return c.functionResponses.length === 0
+        ? { call: { name: 'make_move', args: { move: moves[next++] } } }
+        : { text: 'Played.' }
+    }
+    return { text: 'Your move.' }
+  }
+}
+
+const playWhite = async (page: Page, from: string, to: string) => {
+  await page.locator(`[data-square="${from}"]`).click()
+  await page.locator(`[data-square="${to}"]`).click()
+}
+
+test('chess: the rules end the game — a mating move is not answered by the agent', async ({
+  page,
+}) => {
+  const calls = await mockGemini(page, blackPlays(['e5', 'Nc6', 'Nf6']))
+  await openWithKey(page, 'Chess vs agent')
+  // Scholar's mate: 1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7#
+  for (const [from, to, reply] of [
+    ['e2', 'e4', 'e5'],
+    ['f1', 'c4', 'c6'],
+    ['d1', 'h5', 'f6'],
+  ]) {
+    await playWhite(page, from, to)
+    await expect(page.locator(`[data-square="${reply}"]`)).toHaveAttribute('aria-label', / black /)
+    await expect(page.getByText('Your move (White).')).toBeVisible()
+  }
+  const planned = calls.filter((c) => c.stage === 'planner').length
+  await playWhite(page, 'h5', 'f7')
+
+  await expect(page.locator('.cboard__result')).toContainText('Checkmate — you win (1-0)')
+  await expect(page.locator('.chess-note--result')).toContainText('Checkmate — you win')
+  await expect(page.locator('.cboard__sq.is-movable')).toHaveCount(0)
+  expect(calls.filter((c) => c.stage === 'planner').length).toBe(planned)
+
+  await page.locator('.cboard__result').getByRole('button', { name: 'New game' }).click()
+  await expect(page.locator('.cboard__result')).toHaveCount(0)
+  await expect(page.getByText('Your move (White).')).toBeVisible()
+})
+
+test('chess: a turn the agent fails keeps the board locked until it moves', async ({ page }) => {
+  let quota = false
+  const black = blackPlays(['e5'])
+  await mockGemini(page, (c) =>
+    c.stage === 'executor' && !quota
+      ? { error: { status: 429, message: 'Resource has been exhausted (e.g. check quota).' } }
+      : black(c),
+  )
+  await openWithKey(page, 'Chess vs agent')
+  await playWhite(page, 'e2', 'e4')
+
+  const status = page.locator('.chess__status')
+  await expect(status).toContainText('The agent failed:')
+  await expect(status).toContainText('exhausted')
+  await expect(page.locator('.chess-note--issue')).toBeVisible()
+  await expect(page.locator('.cboard__sq.is-movable')).toHaveCount(0)
+
+  quota = true
+  await status.getByRole('button', { name: 'Retry' }).click()
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute('aria-label', / black /)
+  await expect(page.getByText('Your move (White).')).toBeVisible()
+  await expect(page.locator('.chess-note--issue')).toHaveCount(0)
+})
+
+test('a setting changed mid-run keeps the run going and applies to the next one', async ({
+  page,
+}) => {
+  const calls = await mockGemini(page, (c) =>
+    c.stage === 'planner'
+      ? plan('Say hi')
+      : c.stage === 'executor'
+        ? { text: 'Hi.', delayMs: 1500 }
+        : { text: 'Hi there.' },
+  )
+  await openWithKey(page)
+  await send(page, 'hello')
+  await expect(page.locator('.awr-sendbtn--stop')).toBeVisible()
+  await page.locator('.agentset__title').click()
+  await page.locator('.agentset select').first().selectOption('high')
+  // The rebuild doesn't flip the panel out of "running".
+  await expect(page.locator('.awr-sendbtn--stop')).toBeVisible()
+  await expect(page.locator('.awr-msg--assistant .awr-msg__bubble')).toHaveText('Hi there.')
+
+  // The run in flight kept the agent it started with…
+  const first = calls.splice(0)
+  expect(first.map((c) => c.thinkingLevel)).toEqual([undefined, undefined, undefined])
+  await send(page, 'again')
+  await expect(page.locator('.awr-msg--assistant .awr-msg__bubble').nth(1)).toHaveText('Hi there.')
+  // …and the next run is built with the new setting.
+  expect(calls.length).toBe(3)
+  expect(calls.every((c) => c.thinkingLevel === 'high')).toBe(true)
+})
+
 test('labels: every text of the chat can be swapped (Russian)', async ({ page }) => {
   await mockGemini(page, () => ({ text: 'ok' }))
   await openWithKey(page)

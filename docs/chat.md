@@ -103,7 +103,7 @@ full size) and file chips. The header shows the conversation's total.
 | Prop | |
 | --- | --- |
 | `model` | `{ label, options?, value?, onSelect? }` — chip and switcher |
-| `thinking` | `{ value, options?, onChange }` — shown next to the model |
+| `thinking` | `{ value, options?, onChange }` — shown next to the model; default levels `off` (the provider's default), `none` (thinking off), `low`, `medium`, `high` |
 | `commands` / `builtinCommands` / `skillCommands` | slash commands |
 | `attachments` | `false`, or `{ accept, maxBytes, imageMaxDimension, imageMaxPixels }` |
 | `convertFile` / `convert` | file → text (e.g. PDF → Markdown), `'when-needed'` or `'always'` |

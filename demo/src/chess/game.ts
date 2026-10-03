@@ -7,6 +7,16 @@ import { analyseMove, bestMove, materialWhite } from './engine'
 
 export type GameStatus = 'playing' | 'checkmate' | 'stalemate' | 'draw'
 
+/** How a finished game ended — decided by the rules (chess.js), never by the model. */
+export interface GameOutcome {
+  status: Exclude<GameStatus, 'playing'>
+  winner?: 'w' | 'b'
+  /** 'checkmate', 'stalemate', 'threefold repetition', 'insufficient material', '50-move rule'. */
+  reason: string
+  /** 1-0, 0-1 or ½-½. */
+  score: string
+}
+
 export interface ChessGame {
   fen: string
   /** Side to move. */
@@ -19,6 +29,10 @@ export interface ChessGame {
   status: GameStatus
   /** 'w' | 'b' when the game is over with a winner. */
   winner?: 'w' | 'b'
+  /** Set once the game is over. */
+  outcome?: GameOutcome
+  /** The live position, for code that runs after an await (render state lags). */
+  current: () => { turn: 'w' | 'b'; outcome?: GameOutcome }
   board: ReturnType<Chess['board']>
   /** Squares the piece on `from` can move to (for the user's highlights). */
   targets: (from: Square) => Square[]
@@ -34,12 +48,39 @@ export interface ChessGame {
   describeState: () => string
 }
 
-const statusOf = (c: Chess): { status: GameStatus; winner?: 'w' | 'b' } => {
-  if (c.isCheckmate()) return { status: 'checkmate', winner: c.turn() === 'w' ? 'b' : 'w' }
-  if (c.isStalemate()) return { status: 'stalemate' }
-  if (c.isDraw()) return { status: 'draw' }
-  return { status: 'playing' }
+export const outcomeOf = (c: Chess): GameOutcome | undefined => {
+  if (c.isCheckmate()) {
+    const winner = c.turn() === 'w' ? 'b' : 'w'
+    return {
+      status: 'checkmate',
+      winner,
+      reason: 'checkmate',
+      score: winner === 'w' ? '1-0' : '0-1',
+    }
+  }
+  const draw = (status: 'stalemate' | 'draw', reason: string): GameOutcome => ({
+    status,
+    reason,
+    score: '½-½',
+  })
+  if (c.isStalemate()) return draw('stalemate', 'stalemate')
+  if (c.isThreefoldRepetition()) return draw('draw', 'threefold repetition')
+  if (c.isInsufficientMaterial()) return draw('draw', 'insufficient material')
+  if (c.isDrawByFiftyMoves()) return draw('draw', '50-move rule')
+  if (c.isDraw()) return draw('draw', 'draw')
+  return undefined
 }
+
+const statusOf = (c: Chess): { status: GameStatus; winner?: 'w' | 'b' } => {
+  const o = outcomeOf(c)
+  return o ? { status: o.status, winner: o.winner } : { status: 'playing' }
+}
+
+/** The result in words, from the user's (White's) side. */
+export const outcomeText = (o: GameOutcome): string =>
+  o.status === 'checkmate'
+    ? `Checkmate — ${o.winner === 'w' ? 'you win' : 'the agent wins'} (${o.score})`
+    : `Draw by ${o.reason} (${o.score})`
 
 const sideName = (c: 'w' | 'b') => (c === 'w' ? 'White' : 'Black')
 
@@ -125,6 +166,11 @@ export const useChessGame = (): ChessGame => {
     [version],
   )
 
+  const current = useCallback(
+    () => ({ turn: chessRef.current.turn(), outcome: outcomeOf(chessRef.current) }),
+    [],
+  )
+
   const describeState = useCallback(() => {
     const r = positionReport(chessRef.current, agentColor)
     return `Chess game — you play ${r.yourColor}. ${r.sideToMove} to move${r.inCheck ? ' (in check)' : ''}. Status: ${r.status}. Last move: ${r.lastMove ?? 'none'}. FEN: ${r.fen}`
@@ -178,6 +224,16 @@ export const useChessGame = (): ChessGame => {
             throw new Error(`"${move}" is not legal here. Legal moves: ${c.moves().join(', ')}`)
           }
           const after = positionReport(chessRef.current, agentColor)
+          const outcome = outcomeOf(chessRef.current)
+          if (outcome) {
+            // The rules ended the game; the app shows the result on its own.
+            return {
+              played: san,
+              gameOver: true,
+              result: `${outcome.reason}${outcome.winner ? ` — ${sideName(outcome.winner)} wins` : ''} (${outcome.score})`,
+              note: 'The game is over. Call no more tools; answer in one short sentence.',
+            }
+          }
           return { played: san, status: after.status, inCheck: after.inCheck, fen: after.fen }
         },
       }),
@@ -186,6 +242,7 @@ export const useChessGame = (): ChessGame => {
   )
 
   const c = chessRef.current
+  const outcome = outcomeOf(c)
   const { status, winner } = statusOf(c)
   return {
     fen: c.fen(),
@@ -196,6 +253,8 @@ export const useChessGame = (): ChessGame => {
     inCheck: c.inCheck(),
     status,
     winner,
+    outcome,
+    current,
     board: c.board(),
     targets,
     userMove,

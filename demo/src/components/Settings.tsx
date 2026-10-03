@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ApiKeyForm,
   ModelLoadBar,
@@ -35,7 +35,14 @@ export const Settings = ({
 }: SettingsProps) => {
   const local = isLocal(selected)
   const [userOpen, setUserOpen] = useState<boolean | undefined>(undefined)
+  // A switched model starts over: open while it still needs a key or a load.
+  useEffect(() => setUserOpen(undefined), [selected.id])
   const open = userOpen ?? !ready
+  // The local model in GPU memory, when it isn't the selected one.
+  const held =
+    webllm.loadedModelId && webllm.loadedModelId !== selected.model
+      ? (models.find((m) => m.model === webllm.loadedModelId)?.label ?? webllm.loadedModelId)
+      : undefined
   const status = ready ? (local ? 'loaded' : 'key stored ✓') : local ? 'not loaded' : 'add a key'
   return (
     <details
@@ -85,15 +92,27 @@ export const Settings = ({
           {webllm.loading ? (
             <ModelLoadBar load={{ progress: webllm.progress, text: webllm.text }} />
           ) : webllm.ready ? (
-            <p className="settings__ok">Model loaded — chat away, fully offline.</p>
+            <div className="settings__row">
+              <p className="settings__ok">Model loaded — chat away, fully offline.</p>
+              <button type="button" className="mcp__btn-ghost" onClick={() => void webllm.unload()}>
+                Unload
+              </button>
+            </div>
           ) : (
-            <button
-              className="settings__btn"
-              onClick={() => void webllm.load()}
-              disabled={!webllm.supported}
-            >
-              Download &amp; load model
-            </button>
+            <>
+              {held && (
+                <p className="settings__note">
+                  {held} is in GPU memory — loading this one frees it first.
+                </p>
+              )}
+              <button
+                className="settings__btn"
+                onClick={() => void webllm.load()}
+                disabled={!webllm.supported}
+              >
+                Download &amp; load model
+              </button>
+            </>
           )}
         </div>
       ) : (
