@@ -305,8 +305,9 @@ Two notes:
   you do use MCP.
 - `oauthSupported` is `false` on cores older than `@dudko.dev/agent-web@0.0.9`,
   which introduced `BrowserOAuthProvider`; header auth still works there. The
-  peer floor is `>=0.0.11` — that is the first core whose own peer ranges
-  resolve against AI SDK v7.
+  peer floor is `>=0.0.20` — the first core with the virtual file system,
+  attachments, consent, tool search, subagents and context editing this
+  package's chat builds on.
 
 ## Several MCP servers — `useMcpServers`
 
