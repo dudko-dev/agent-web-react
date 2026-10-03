@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import type { AgentToolSet } from '@dudko.dev/agent-web'
+import { markReadOnly, type AgentToolSet } from '@dudko.dev/agent-web'
 import { tool } from 'ai'
 import { z } from 'zod'
 
@@ -97,11 +97,14 @@ export const useNotesBoard = (): NotesBoard => {
         }),
         promptHint: '{ id: number }',
       },
-      list_notes: tool({
-        description: 'List all notes currently on the board.',
-        inputSchema: z.object({}),
-        execute: async () => ({ notes: notesRef.current }),
-      }),
+      // Read-only: in "ask before changes" mode it runs without a prompt.
+      list_notes: markReadOnly(
+        tool({
+          description: 'List all notes currently on the board.',
+          inputSchema: z.object({}),
+          execute: async () => ({ notes: notesRef.current }),
+        }),
+      ),
       clear_board: tool({
         description: 'Remove every note from the board.',
         inputSchema: z.object({}),

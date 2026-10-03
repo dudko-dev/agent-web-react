@@ -29,7 +29,14 @@ body,
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   font-size: 15px;
 }
 a {
@@ -81,7 +88,7 @@ a {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(320px, 420px) 1fr;
+  grid-template-columns: minmax(360px, 540px) 1fr;
   gap: 16px;
 }
 @media (max-width: 820px) {
@@ -90,6 +97,14 @@ a {
   }
   .app__main {
     grid-template-columns: 1fr;
+  }
+  .app__chat {
+    height: 78vh;
+    min-height: 420px;
+  }
+  /* On a phone the board is the game: show it before the chat. */
+  .app__main--chess .app__right {
+    order: -1;
   }
 }
 
@@ -279,8 +294,12 @@ a {
   display: flex;
   gap: 6px;
   margin-bottom: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .app__tab {
+  flex: none;
+  white-space: nowrap;
   padding: 8px 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -439,4 +458,386 @@ a {
 }
 .mcp__hint code {
   font-size: 11px;
+}
+
+/* ── Several MCP servers ──────────────────────────────────────────────────── */
+.mcp__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.mcp__badge {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+.mcp__badge--muted {
+  background: var(--bg);
+  color: var(--muted);
+}
+.mcp__servers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mcp__server {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mcp__server-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mcp__server-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.mcp__server-status {
+  color: var(--muted);
+  font-size: 13px;
+}
+.mcp__server-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.mcp__server-actions .settings__btn,
+.mcp__server-actions .mcp__btn-ghost {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.mcp__server-url {
+  font-size: 12px;
+  color: var(--muted);
+  word-break: break-all;
+}
+.mcp__server--connected .mcp__dot {
+  background: #16a34a;
+}
+.mcp__server--connecting .mcp__dot {
+  background: #f59e0b;
+}
+.mcp__server--needs-authorization .mcp__dot {
+  background: #6366f1;
+}
+.mcp__server--error .mcp__dot {
+  background: #dc2626;
+}
+.mcp__tools-toggle {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+}
+.mcp__ro {
+  font-size: 11px;
+  color: #16a34a !important;
+}
+.mcp__form-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.mcp__grow {
+  flex: 1 1 auto;
+}
+.mcp__name {
+  width: 150px;
+  flex: none;
+}
+.mcp__mock {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+/* ── Agent settings ───────────────────────────────────────────────────────── */
+.agentset {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agentset[open] {
+  gap: 10px;
+}
+.agentset > *:not(summary) {
+  margin-top: 10px;
+}
+.agentset__title {
+  cursor: pointer;
+  font-weight: 600;
+}
+.agentset__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.agentset__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.agentset__grid .settings__select {
+  width: 100%;
+}
+.agentset__checks {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.agentset__skills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.agentset__skills li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.agentset__skills .mcp__btn-ghost {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.agentset__add > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+}
+.agentset__add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.agentset__textarea {
+  width: 100%;
+  margin: 8px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
+}
+
+/* ── Chess ────────────────────────────────────────────────────────────────── */
+.chess {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chess__status {
+  font-size: 14px;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+}
+.chess__status .mcp__btn-ghost {
+  padding: 3px 10px;
+  font-size: 13px;
+}
+.chess__thinking {
+  color: var(--accent);
+  animation: chess-pulse 1.2s ease-in-out infinite;
+}
+@keyframes chess-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+.chess__controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.chess__analysts {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.chess__moves {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.cboard {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: min(100%, 480px);
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  user-select: none;
+}
+.cboard__sq {
+  position: relative;
+  border: none;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: default;
+  font: inherit;
+}
+.cboard__sq--light {
+  background: #eedcbb;
+}
+.cboard__sq--dark {
+  background: #b58863;
+}
+.cboard__sq.is-movable {
+  cursor: pointer;
+}
+.cboard__sq.is-selected {
+  box-shadow: inset 0 0 0 3px #4f46e5;
+}
+.cboard__sq.is-last {
+  background-image: linear-gradient(rgba(250, 204, 21, 0.38), rgba(250, 204, 21, 0.38));
+}
+.cboard__sq.is-check {
+  background-image: radial-gradient(circle, rgba(220, 38, 38, 0.85) 0%, rgba(220, 38, 38, 0) 70%);
+}
+.cboard__sq.is-target {
+  cursor: pointer;
+}
+.cboard__sq.is-target::after {
+  content: '';
+  width: 26%;
+  height: 26%;
+  border-radius: 50%;
+  background: rgba(79, 70, 229, 0.45);
+}
+.cboard__sq.is-capture {
+  cursor: pointer;
+  box-shadow: inset 0 0 0 4px rgba(79, 70, 229, 0.55);
+}
+.cboard__piece {
+  font-size: clamp(22px, 5vw, 44px);
+  line-height: 1;
+  pointer-events: none;
+}
+.cboard__piece--w {
+  color: #fff;
+  text-shadow:
+    0 0 2px #000,
+    0 0 1px #000;
+}
+.cboard__piece--b {
+  color: #111;
+}
+.cboard__rank,
+.cboard__file {
+  position: absolute;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.cboard__rank {
+  top: 2px;
+  left: 3px;
+}
+.cboard__file {
+  bottom: 1px;
+  right: 3px;
+}
+@media (max-width: 820px) {
+  .agentset__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.chess__agent-turn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.agentset__peek {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.app__left {
+  overflow-y: auto;
+}
+
+/* The demo's Markdown answers (see markdown.tsx). */
+.md {
+  white-space: normal;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md pre {
+  margin: 0 0 6px;
+}
+.md ul,
+.md ol {
+  padding-left: 20px;
+}
+.md code {
+  font-family: var(--awr-mono);
+  font-size: 0.92em;
+  background: color-mix(in srgb, var(--awr-fg) 8%, transparent);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.md pre {
+  font-family: var(--awr-mono);
+  font-size: 12px;
+  background: color-mix(in srgb, var(--awr-fg) 6%, transparent);
+  border-radius: 8px;
+  padding: 8px;
+  overflow-x: auto;
+  white-space: pre;
+}
+.md .md-h {
+  display: block;
+  margin: 4px 0;
 }

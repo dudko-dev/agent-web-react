@@ -8,9 +8,17 @@ app with a single hook and (optionally) a set of pre-styled components:
   a ready-to-render state (plan, steps, tool calls, streamed answer, token
   usage, model-load progress, chat transcript), and get `run` / `stop` /
   `reset` / `reload`.
-- 🧩 **`<AgentProvider>` + components** — a drop-in `<AgentChat>` panel plus
-  `<PlanView>`, `<StepList>`, `<Composer>`, `<ModelLoadBar>`, `<UsageBadge>`,
-  and `<ApiKeyForm>`. Bring your own CSS or import the optional stylesheet.
+- 💬 **`<AgentChat>`** — a drop-in chat: every tool call with its cost, tokens by
+  kind per answer and in total, thoughts, subagents, consent prompts; a
+  composer with "+" / Ctrl+V / drag & drop attachments (images, PDFs, files),
+  "/" commands, run timer, agents, model + thinking chip, the "⚡ Auto" consent
+  chip and speech to text; saved chats in IndexedDB and a workspace (virtual
+  file system) panel. Everything is a prop: show/hide, labels (i18n), render
+  props, slots, swappable components, theme — see [docs/chat.md](docs/chat.md).
+- 🧩 **Building blocks** — `<AgentComposer>`, `<MessageList>`, `<StepList>`,
+  `<ToolApprovalPrompt>`, `<ChatHistoryList>`, `<FilesPanel>`, `<ContextMeter>`,
+  `<ModelLoadBar>`, `<UsageBadge>`, `<ApiKeyForm>`; hooks `useChatHistory`,
+  `useVirtualFiles`, `useSpeechToText`, `useMcpServers`.
 - 🔑 **`useCredentials`** — store BYOK API keys **encrypted at rest**
   (WebCrypto + IndexedDB).
 - 🖥️ **`useWebLLMModel`** — load a local WebGPU model with download progress.
@@ -22,9 +30,11 @@ app with a single hook and (optionally) a set of pre-styled components:
 [![license](https://img.shields.io/npm/l/@dudko.dev/agent-web-react.svg)](https://www.npmjs.com/package/@dudko.dev/agent-web-react)
 ![GitHub last commit](https://img.shields.io/github/last-commit/dudko-dev/agent-web-react.svg)
 
-> **▶︎ [Live demo](https://dudko-dev.github.io/agent-web-react/)** — an agent that
-> edits a sticky-notes board via tools. Cloud BYOK or local WebGPU, all in your
-> browser. Source in [`demo/`](demo/).
+> **▶︎ [Live demo](https://dudko-dev.github.io/agent-web-react/)** — three agents:
+> one edits a sticky-notes board, one drives any number of MCP servers (plus a
+> 185-tool mock catalogue to show tool search), and one plays chess against you
+> — your move triggers it, analyst subagents run in Web Workers. Cloud BYOK or
+> local WebGPU, all in your browser. Source in [`demo/`](demo/).
 
 ## Install
 
@@ -155,20 +165,26 @@ function Custom() {
 
 | Field | Description |
 | --- | --- |
-| `run(goal)` | Start a run; resolves with the `RunResult` |
+| `run(goal, { images, files, attachments, label })` | Start a run (with attachments); resolves with the `RunResult` |
 | `stop()` | Abort the in-flight run |
-| `reset()` | Clear the whole conversation |
+| `reset()` | Clear the whole conversation (and the agent's memory of it) |
 | `reload()` | Rebuild the agent (e.g. after storing a new key) |
 | `status` | `idle` \| `initializing` \| `ready` \| `running` \| `error` |
 | `isReady` / `isRunning` | convenience booleans |
-| `messages` | chat transcript (`{ role, content, pending }[]`) |
-| `plan` / `steps` | the live plan and per-step tool calls |
-| `finalText` | the streamed final answer |
-| `usage` | running token total |
+| `messages` | transcript; each assistant message keeps its steps, tool calls, thoughts, approvals, subagents, usage and duration |
+| `plan` / `steps` | the live plan and per-step tool calls (with timing) |
+| `finalText` / `finalReasoning` | the streamed answer and its thoughts |
+| `usage` / `totalUsage` | tokens of this run / of the conversation, by kind |
+| `pendingApprovals`, `approve(id, { remember })`, `deny(id)` | tool consent |
+| `approvalMode` / `setApprovalMode(mode)` | the autopilot switch, live |
+| `compact()` | summarise the stored transcript now |
+| `sessionId` / `loadChat(chat)` | the memory session; switch conversations |
+| `subagents`, `skills`, `discoveredTools`, `compactions`, `budget` | the rest of the run, folded |
 | `modelLoad` | WebLLM download progress, when loading |
 
 **Options:** `deps` (rebuild the agent when these change — e.g. on a model
-switch), `onEvent` (tap the raw event stream), `autoStart`, `maxEvents`.
+switch), `onEvent` (tap the raw event stream), `autoStart`, `maxEvents`,
+`approvals` (route consent requests into the hook; default true).
 
 > Keep `tools` and `describeState` referentially stable (`useMemo` /
 > `useCallback`); pass a changed `deps` array to rebuild the agent on a
@@ -289,25 +305,48 @@ Two notes:
   you do use MCP.
 - `oauthSupported` is `false` on cores older than `@dudko.dev/agent-web@0.0.9`,
   which introduced `BrowserOAuthProvider`; header auth still works there. The
-  peer floor is `>=0.0.11` — that is the first core whose own peer ranges
-  resolve against AI SDK v7.
+  peer floor is `>=0.0.20` — the first core with the virtual file system,
+  attachments, consent, tool search, subagents and context editing this
+  package's chat builds on.
+
+## Several MCP servers — `useMcpServers`
+
+```tsx
+const mcp = useMcpServers({ clientName: 'my-app' }) // the list persists; reconnects on load
+await mcp.add({ name: 'docs', url, auth: 'oauth' }) // 'none' | 'bearer' (+ token) | 'oauth'
+mcp.servers  // [{ name, url, status, catalog, error, … }]
+const config = { model, tools: { ...myTools, ...mcp.tools } } // "<name>__<tool>"
+```
+
+Servers connect in parallel, each with its own deadline; paginated tool lists
+are read to the end; tools a server marks read-only skip the "ask before
+changes" prompt. With hundreds of tools the core switches to **tool search**
+(a compact catalogue + `find_tools`) above `toolSearchThreshold` — see the
+core's [capabilities doc](https://github.com/dudko-dev/agent-web/blob/main/docs/capabilities.md).
 
 ## Components
 
 All components are optional and styled by `styles.css` (class-prefixed `awr-`,
-themeable via `--awr-*` custom properties, light + dark). Each accepts a
-`className`; data components take plain props so you can use them standalone.
+themeable via `--awr-*` custom properties, light + dark, or `theme`). Each
+accepts a `className` and `labels`; data components take plain props so you can
+use them standalone. The full guide: [docs/chat.md](docs/chat.md).
 
 | Component | Purpose |
 | --- | --- |
-| `<AgentChat>` | Full panel: transcript + live activity + composer. Reads a `controller` prop or the `<AgentProvider>` context. |
-| `<MessageList>` | The chat transcript. |
-| `<Composer>` | Textarea + send/stop button (Enter to send). |
+| `<AgentChat>` | Full panel: transcript with per-answer activity + composer + optional history and files panels. Reads a `controller` prop or the `<AgentProvider>` context. |
+| `<AgentComposer>` | The input and its toolbar: attachments, commands, timer, agents, model/thinking, consent, mic, send/stop. |
+| `<MessageList>` | The transcript; each answer with its steps, tool calls, thoughts, usage. |
+| `<StepList>` / `<ToolCallRow>` | Execution steps / one tool call with its cost and images. |
+| `<ToolApprovalPrompt>` | Consent cards (Allow once / Always / Deny). |
+| `<ApprovalModeSwitch>` | Segmented consent-mode switch. |
+| `<ChatHistoryList>` | Saved chats (from `useChatHistory`). |
+| `<FilesPanel>` | A `VirtualFileSystem`, live: preview, download, delete, upload. |
+| `<ContextMeter>` | Tokens by kind, budget bar, last compaction, Compact. |
 | `<PlanView>` | A plan's reasoning + step list. |
-| `<StepList>` | Live execution steps with tool calls. |
 | `<ModelLoadBar>` | WebLLM download/init progress. |
 | `<UsageBadge>` | Compact token readout. |
 | `<ApiKeyForm>` | BYOK key entry that writes to the encrypted vault. |
+| `<Composer>` | The minimal textarea + send/stop (kept for existing apps). |
 
 ### Build your own UI
 
@@ -344,10 +383,17 @@ from one place.
 
 ## Browser tests
 
-`npm run test:e2e` builds the demo and drives it in Chromium: connecting to a
-remote MCP server, the full OAuth redirect round-trip (authorize → come back
-with a code → connected), reuse of the stored tokens after a reload, and the
-error path for an unreachable server. The MCP and authorization servers it
+`npm run test:e2e` builds the demo and drives it in Chromium:
+
+- MCP: connecting to one and to several servers, the full OAuth redirect
+  round-trip (authorize → come back with a code → connected), reconnecting
+  with the stored tokens after a reload, and an unreachable server;
+- the agent, against a scripted Gemini endpoint ([`e2e/gemini.ts`](e2e/gemini.ts),
+  the real `@ai-sdk/google` provider underneath): tool calls and tokens by
+  kind in the transcript, a chat saved and restored after a reload, an image
+  attached (shown, sent as a file part, saved in the workspace), a file
+  dropped anywhere on the page, consent in "Ask" mode, slash commands, the
+  chess move that triggers the agent, and Russian labels. The MCP and authorization servers it
 talks to are started on loopback by [`e2e/servers.ts`](e2e/servers.ts), CORS
 headers included — so the test also pins the deployment requirement that the
 challenge header be exposed.
