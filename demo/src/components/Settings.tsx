@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   ApiKeyForm,
   ModelLoadBar,
@@ -14,9 +15,15 @@ export interface SettingsProps {
   webllm: UseWebLLMModelReturn
   /** Rebuild the agent after a key changes so it picks up the new credential. */
   onKeyChange: () => void
+  /** A usable model is in hand (key stored / local model loaded): start collapsed. */
+  ready: boolean
 }
 
-/** Provider picker + BYOK key entry (cloud) or WebGPU model loader (local). */
+/**
+ * Provider picker + BYOK key entry (cloud) or WebGPU model loader (local).
+ * Open while there is nothing to talk to; once a key is stored (or a local
+ * model loaded) it folds into one line, so the chat gets the height.
+ */
 export const Settings = ({
   models,
   selected,
@@ -24,10 +31,26 @@ export const Settings = ({
   credentials,
   webllm,
   onKeyChange,
+  ready,
 }: SettingsProps) => {
   const local = isLocal(selected)
+  const [userOpen, setUserOpen] = useState<boolean | undefined>(undefined)
+  const open = userOpen ?? !ready
+  const status = ready ? (local ? 'loaded' : 'key stored ✓') : local ? 'not loaded' : 'add a key'
   return (
-    <div className="settings">
+    <details
+      className="settings"
+      open={open}
+      onToggle={(e) => {
+        const now = e.currentTarget.open
+        if (now !== open) setUserOpen(now)
+      }}
+    >
+      <summary className="settings__summary">
+        <span className="settings__summary-title">Model</span>
+        <span className="settings__summary-value">{selected.label}</span>
+        <span className={`settings__summary-status${ready ? ' is-ok' : ''}`}>{status}</span>
+      </summary>
       <label className="settings__field">
         <span className="settings__label">Model</span>
         <select
@@ -88,6 +111,6 @@ export const Settings = ({
           Get a {selected.keyLabel} →
         </a>
       )}
-    </div>
+    </details>
   )
 }

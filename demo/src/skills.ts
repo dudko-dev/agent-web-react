@@ -41,6 +41,13 @@ export const BUILTIN_SKILLS: Skill[] = [
   },
 ]
 
+/** Which tabs a built-in skill belongs to (custom skills apply everywhere). */
+export const SKILL_TABS: Record<string, ('notes' | 'mcp' | 'chess')[]> = {
+  'chess-coach': ['chess'],
+  'board-style': ['notes'],
+  'precise-answers': ['mcp'],
+}
+
 export const SKILL_TEMPLATE = `---
 name: my-skill
 description: When the agent should use this skill, in one line.

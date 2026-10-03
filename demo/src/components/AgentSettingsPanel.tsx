@@ -4,11 +4,19 @@ import {
   loadSkillFromUrl,
   parseSkillMarkdown,
 } from '@dudko.dev/agent-web-react'
-import { allSkills, type DemoSettings, type ThinkingChoice } from '../settings'
+import {
+  allSkills,
+  skillsOfView,
+  type DemoSettings,
+  type ThinkingChoice,
+  type View,
+} from '../settings'
 import { BUILTIN_SKILLS, SKILL_TEMPLATE } from '../skills'
 
 export interface AgentSettingsPanelProps {
   settings: DemoSettings
+  /** The open tab: its skills are listed, and the notes speak about its tools. */
+  view: View
   update: (patch: Partial<DemoSettings>) => void
   onReset: () => void
 }
@@ -20,10 +28,19 @@ const k = (n: number) => (n >= 1_000_000 ? `${n / 1_000_000}M` : `${n / 1000}k`)
 
 /**
  * Everything the agent loop exposes, as settings: tool consent (the autopilot
- * switch), thinking, run limits, context compaction and skills. Shared by all
- * three tabs.
+ * switch), thinking, run limits, context compaction and skills. The loop
+ * settings are shared by all three tabs; the skills shown are the open tab's.
  */
-export const AgentSettingsPanel = ({ settings, update, onReset }: AgentSettingsPanelProps) => {
+export const AgentSettingsPanel = ({
+  settings,
+  view,
+  update,
+  onReset,
+}: AgentSettingsPanelProps) => {
+  const skills = skillsOfView(settings, view)
+  const enabledHere = skills.filter((s) => settings.enabledSkills.includes(s.name)).length
+  const writeExample =
+    view === 'chess' ? 'a chess move' : view === 'mcp' ? 'a write to your MCP server' : 'a note'
   const [draft, setDraft] = useState('')
   const [skillUrl, setSkillUrl] = useState('')
   const [skillError, setSkillError] = useState<string | undefined>()
@@ -72,7 +89,7 @@ export const AgentSettingsPanel = ({ settings, update, onReset }: AgentSettingsP
         Agent settings{' '}
         <span className="agentset__peek">
           {settings.approvalMode === 'autopilot' ? 'autopilot' : settings.approvalMode} · thinking{' '}
-          {settings.thinking} · {settings.enabledSkills.length} skill(s)
+          {settings.thinking} · {enabledHere} skill(s)
         </span>
       </summary>
 
@@ -86,7 +103,7 @@ export const AgentSettingsPanel = ({ settings, update, onReset }: AgentSettingsP
           {settings.approvalMode === 'autopilot'
             ? 'Autopilot: the agent runs every tool on its own.'
             : settings.approvalMode === 'ask-writes'
-              ? 'Read-only tools run freely; you approve anything that changes state (a note, a chess move, a write to your MCP server).'
+              ? `Read-only tools run freely; you approve anything that changes state (${writeExample}).`
               : settings.approvalMode === 'ask-all'
                 ? 'You approve every single tool call.'
                 : 'Read-only: changes are refused without asking — the agent can only look.'}{' '}
@@ -244,7 +261,7 @@ export const AgentSettingsPanel = ({ settings, update, onReset }: AgentSettingsP
       <div className="agentset__group">
         <span className="settings__label">Skills</span>
         <ul className="agentset__skills">
-          {allSkills(settings).map((s) => (
+          {skills.map((s) => (
             <li key={s.name}>
               <label title={s.content}>
                 <input

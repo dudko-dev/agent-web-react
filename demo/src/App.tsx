@@ -30,10 +30,12 @@ import { buildCloudModel, createLocalModel } from './providers'
 import { RU_LABELS } from './i18n'
 import { Markdown } from './markdown'
 import {
+  enabledSkillsFor,
   useDemoSettings,
   useSettingsConfig,
   type AnalystMode,
   type ThinkingChoice,
+  type View,
 } from './settings'
 import { pdfToMarkdown, workspace } from './workspace'
 
@@ -50,7 +52,7 @@ The user's workspace is reachable with the fs_* tools (attachments are under /at
 
 const chessPrompt = (
   analysts: AnalystMode,
-) => `You play chess as Black against the user (White) on the board shown in this app. Each run starts right after the user's move.
+) => `You play chess as Black against the user (White) on the board shown in this app. Each run starts right after the user's move and is ONE step: reply to that move.
 On your turn: 1) call get_position; 2) pick 2-4 candidate moves and ${
   analysts === 'off'
     ? 'check them with evaluate_moves'
@@ -59,7 +61,6 @@ On your turn: 1) call get_position; 2) pick 2-4 candidate moves and ${
 Then reply with one or two friendly sentences: your idea and any threat. Never ask the user anything.
 If make_move fails, read its error (it lists the legal moves) and try again. If the game is over, say so and do not move.`
 
-type View = 'notes' | 'mcp' | 'chess'
 const VIEWS: View[] = ['notes', 'mcp', 'chess']
 
 /**
@@ -131,12 +132,24 @@ export const App = () => {
   )
   // The agents can read the attachments and write files into the workspace.
   const fileTools = useMemo(() => createFileTools(workspace), [])
+  // Each tab gets only its own skills (chess coaching has no place in an MCP
+  // chat); custom skills apply everywhere.
+  const skillsByTab = useMemo(
+    () => ({
+      notes: enabledSkillsFor(settings, 'notes'),
+      mcp: enabledSkillsFor(settings, 'mcp'),
+      chess: enabledSkillsFor(settings, 'chess'),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings.customSkills, settings.enabledSkills],
+  )
   const base = (tab: View): Partial<BrowserAgentConfig> => ({
     model: resolvedModel as ModelInput,
     credentials: credentials.store,
     memory: memories[tab],
     sessionId: tab,
     ...settingsConfig,
+    skills: skillsByTab[tab],
     // The consent mode is applied live by useAgent — no rebuild on a switch.
     toolApproval: { mode: settings.approvalMode },
     // Stream the agent's internal phases to the console — handy for poking.
@@ -154,7 +167,7 @@ export const App = () => {
       describeState: board.describeState,
       systemPrompt: NOTES_PROMPT,
     },
-    { deps },
+    { deps: [...deps, skillsByTab.notes] },
   )
 
   // ── Tab 2: any number of MCP servers (+ an optional mock catalogue) ────────
@@ -172,7 +185,7 @@ export const App = () => {
       tools: mcpTools,
       systemPrompt: MCP_PROMPT,
     },
-    { deps: [...deps, mcpTools] },
+    { deps: [...deps, mcpTools, skillsByTab.mcp] },
   )
 
   // ── Tab 3: chess against the agent, with analyst subagents ─────────────────
@@ -234,8 +247,12 @@ export const App = () => {
       tools: { ...game.tools, ...analysts },
       describeState: game.describeState,
       systemPrompt: chessPrompt(settings.analysts),
+      // A turn is one step: read, weigh, move. No second step to re-read the
+      // board (it then found White to move and "waited"), no replanner calls.
+      maxPlanSteps: 1,
+      replan: false,
     },
-    { deps: [...deps, analysts] },
+    { deps: [...deps, analysts, skillsByTab.chess] },
   )
 
   const chessRun = chessAgent.run
@@ -355,19 +372,27 @@ export const App = () => {
 
       <main className={`app__main app__main--${view}`}>
         <section className="app__left">
-          <Settings
-            models={MODELS}
-            selected={model}
-            onSelect={setModelId}
-            credentials={credentials}
-            webllm={webllm}
-            onKeyChange={() => {
-              notesAgent.reload()
-              mcpAgent.reload()
-              chessAgent.reload()
-            }}
-          />
-          <AgentSettingsPanel settings={settings} update={update} onReset={resetSettings} />
+          <div className="app__setup">
+            <Settings
+              models={MODELS}
+              selected={model}
+              onSelect={setModelId}
+              credentials={credentials}
+              webllm={webllm}
+              onKeyChange={() => {
+                notesAgent.reload()
+                mcpAgent.reload()
+                chessAgent.reload()
+              }}
+              ready={Boolean(resolvedModel)}
+            />
+            <AgentSettingsPanel
+              settings={settings}
+              view={view}
+              update={update}
+              onReset={resetSettings}
+            />
+          </div>
           <div className="app__chat">
             {view === 'notes' && (
               <AgentChat

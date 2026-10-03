@@ -30,8 +30,8 @@ Three tabs, sharing one "Agent settings" panel:
 The **Agent settings** panel drives the core's features live: tool consent
 (⚡ autopilot / ask before changes / ask everything / read-only), thinking
 level, token / tool-call / step limits, context window and auto-compaction,
-skills (built-in examples, your own, or imported `SKILL.md`), the chess
-analysts — and the **chat UI**: tool calls, token usage, saved chats
+skills (each tab lists its own built-in examples; your own or imported
+`SKILL.md` ones apply to every tab), the chess analysts — and the **chat UI**: tool calls, token usage, saved chats
 (IndexedDB), the files panel, theme, and the labels (English / Russian — every
 string of the chat is a prop).
 
