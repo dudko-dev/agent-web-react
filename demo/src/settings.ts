@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { BrowserAgentConfig, Skill, ToolApprovalMode } from '@dudko.dev/agent-web'
-import { BUILTIN_SKILLS } from './skills'
+import { BUILTIN_SKILLS, SKILL_TABS } from './skills'
+
+export type View = 'notes' | 'mcp' | 'chess'
 
 export type ThinkingChoice = 'off' | 'low' | 'medium' | 'high'
 export type AnalystMode = 'off' | 'worker' | 'in-process'
@@ -86,16 +88,20 @@ export const useDemoSettings = () => {
 /** All skills the user can toggle: built-in examples + their own. */
 export const allSkills = (s: DemoSettings): Skill[] => [...BUILTIN_SKILLS, ...s.customSkills]
 
+/** The skills that make sense on a tab: its built-ins plus every custom skill. */
+export const skillsOfView = (s: DemoSettings, view: View): Skill[] =>
+  allSkills(s).filter((k) => !SKILL_TABS[k.name] || SKILL_TABS[k.name].includes(view))
+
+/** The enabled skills an agent on this tab gets. */
+export const enabledSkillsFor = (s: DemoSettings, view: View): Skill[] =>
+  skillsOfView(s, view).filter((k) => s.enabledSkills.includes(k.name))
+
 /**
  * The part of BrowserAgentConfig the settings decide. `rebuildKey` changes when
  * a setting that is baked in at createAgent changes (the consent mode is NOT
  * in it — the hook applies that one live, mid-run even).
  */
 export const useSettingsConfig = (s: DemoSettings) => {
-  const skills = useMemo(
-    () => allSkills(s).filter((k) => s.enabledSkills.includes(k.name)),
-    [s.customSkills, s.enabledSkills],
-  )
   const baked = {
     thinking: s.thinking,
     maxTotalTokens: s.maxTotalTokens,
@@ -104,7 +110,6 @@ export const useSettingsConfig = (s: DemoSettings) => {
     maxStepsPerTask: s.maxStepsPerTask,
     autoCompact: s.autoCompact,
     contextWindowTokens: s.contextWindowTokens,
-    skills: skills.map((k) => k.name),
   }
   const rebuildKey = JSON.stringify(baked)
   const config = useMemo<Partial<BrowserAgentConfig>>(
@@ -121,7 +126,6 @@ export const useSettingsConfig = (s: DemoSettings) => {
         thresholdTokens: Math.min(6_000, Math.floor(s.contextWindowTokens / 2)),
         keepRecentTurns: 4,
       },
-      skills,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rebuildKey],
