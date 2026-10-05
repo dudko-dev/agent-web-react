@@ -1,8 +1,6 @@
 /// <reference lib="webworker" />
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { createOpenAI } from '@ai-sdk/openai'
 import { serveSubagentWorker, type ProviderModelSpec } from '@dudko.dev/agent-web'
+import { buildCloudModel, type CloudProvider } from '../cloud'
 import { engineTools } from './analyst-tools'
 
 /**
@@ -12,24 +10,10 @@ import { engineTools } from './analyst-tools'
  * would otherwise stall the page, and answers with a verdict.
  *
  * The model is built here from the spec the parent posted (its key arrives with
- * the task and is never stored). Provider factories are imported statically —
- * a bundler cannot resolve the core's dynamic provider imports in a worker.
+ * the task and is never stored), with the same builder as the page — the spec's
+ * `providerType` carries the demo's cloud provider name.
  */
-const resolveModel = (spec: ProviderModelSpec) => {
-  const apiKey = spec.apiKey
-  switch (spec.providerType) {
-    case 'google':
-      return createGoogleGenerativeAI({ apiKey })(spec.model)
-    case 'anthropic':
-      return createAnthropic({
-        apiKey,
-        headers: { 'anthropic-dangerous-direct-browser-access': 'true' },
-      })(spec.model)
-    case 'openai':
-      return createOpenAI({ apiKey })(spec.model)
-    default:
-      throw new Error(`the analyst worker has no factory for "${spec.providerType}"`)
-  }
-}
+const resolveModel = (spec: ProviderModelSpec) =>
+  buildCloudModel(spec.providerType as CloudProvider, spec.model, spec.apiKey ?? '')
 
 serveSubagentWorker({ resolveModel, tools: engineTools(3) })

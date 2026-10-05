@@ -42,7 +42,15 @@ export type {
   McpServerResult,
   McpModule,
 } from './mcp-types.js'
-export { useWebLLMModel } from './hooks/use-webllm-model.js'
+export { createWebLLMEngine, useWebLLMModel } from './hooks/use-webllm-model.js'
+export { useLocalModel } from './hooks/use-local-model.js'
+export type {
+  LocalModelEngine,
+  LocalModelLoadContext,
+  LocalModelProgress,
+  UseLocalModelOptions,
+  UseLocalModelReturn,
+} from './hooks/use-local-model.js'
 export type {
   UseWebLLMModelReturn,
   UseWebLLMModelOptions,

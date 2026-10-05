@@ -22,6 +22,11 @@ export interface DemoSettings {
   /** Tool-calling rounds inside one step. */
   maxStepsPerTask: number
   autoCompact: boolean
+  /**
+   * Fewer model calls per turn: no replanning and no separate final answer —
+   * the step's own reply is the answer (2 calls instead of 3+).
+   */
+  fastAnswers: boolean
   /** The window compaction works with; 0 = the model's own (auto). */
   contextWindowTokens: number
   /** Names of enabled skills (built-in and custom). */
@@ -49,6 +54,7 @@ export const DEFAULT_SETTINGS: DemoSettings = {
   maxIterations: 6,
   maxStepsPerTask: 4,
   autoCompact: true,
+  fastAnswers: false,
   contextWindowTokens: 0,
   enabledSkills: BUILTIN_SKILLS.map((s) => s.name),
   customSkills: [],
@@ -116,6 +122,7 @@ export const useSettingsConfig = (s: DemoSettings, modelWindow: number | undefin
     maxIterations: s.maxIterations,
     maxStepsPerTask: s.maxStepsPerTask,
     autoCompact: s.autoCompact,
+    fastAnswers: s.fastAnswers,
     contextWindowTokens: window,
   }
   const rebuildKey = JSON.stringify(baked)
@@ -133,6 +140,9 @@ export const useSettingsConfig = (s: DemoSettings, modelWindow: number | undefin
         thresholdTokens: Math.min(6_000, Math.floor(window / 2)),
         keepRecentTurns: 4,
       },
+      // Fast answers: the executor's reply is the answer — no synthesizer call,
+      // no replanner call (the planner and the step remain).
+      ...(s.fastAnswers ? { synthesize: false, replan: false } : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rebuildKey],

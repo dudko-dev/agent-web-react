@@ -21,7 +21,9 @@ app with a single hook and (optionally) a set of pre-styled components:
   `useVirtualFiles`, `useSpeechToText`, `useMcpServers`.
 - 🔑 **`useCredentials`** — store BYOK API keys **encrypted at rest**
   (WebCrypto + IndexedDB).
-- 🖥️ **`useWebLLMModel`** — load a local WebGPU model with download progress.
+- 🖥️ **`useWebLLMModel`** / **`useLocalModel`** — load an on-device model (WebLLM,
+  the browser's built-in model, transformers.js, or your own runtime) with
+  download progress, switching and unloading.
 - 🎛️ **Headless-first** — the event→UI logic is a pure, exported reducer
   (`agentStateReducer`); the components are optional sugar on top.
 
@@ -240,6 +242,37 @@ function LocalAgent() {
 >
 > **Vision.** `Phi-3.5-vision-instruct-q4f16_1-MLC` takes images (paste, drop
 > or attach them) — a multimodal model that never sends them anywhere.
+
+### Any on-device runtime — `useLocalModel`
+
+`useWebLLMModel` is `useLocalModel` with the WebLLM engine. Describe another
+runtime as an engine — `create`, and optionally `warmUp` (download now, with
+progress), `unload`, `supported`, `contextWindowOf` — and the hook gives the
+same `load` / `unload` / progress / switching:
+
+```tsx
+import { useLocalModel, createWebLLMEngine, type LocalModelEngine } from '@dudko.dev/agent-web-react'
+
+const builtIn: LocalModelEngine = {
+  create: async () => (await import('@browser-ai/core')).browserAI('text', {
+    expectedInputs: [{ type: 'text' }, { type: 'image' }],
+  }),
+  warmUp: async (m, { onProgress }) => {
+    await m.createSessionWithProgress((p) => onProgress({ progress: p, text: 'Downloading' }))
+  },
+  supported: () => 'LanguageModel' in globalThis, // Chrome's Prompt API
+  contextWindowOf: (m) => m.getContextWindow(),
+}
+const webllm = createWebLLMEngine({ create: createLocalModel })
+
+// One hook, any runtime: switching frees the previous model with its own engine.
+const local = useLocalModel(option.model, option.builtIn ? builtIn : webllm, {
+  contextWindowTokens: option.contextWindow,
+})
+```
+
+The demo runs WebLLM, Chrome's Gemini Nano and transformers.js this way — see
+[`demo/src/local-engines.ts`](demo/src/local-engines.ts).
 
 ## Models in a bundler (Vite, Next, CRA)
 

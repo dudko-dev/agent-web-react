@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Square } from 'chess.js'
-import type { BrowserAgentConfig, ModelInput } from '@dudko.dev/agent-web'
+import type { BrowserAgentConfig, ModelInput, ProviderType } from '@dudko.dev/agent-web'
 import {
   AgentChat,
   ChatHistoryStore,
@@ -11,7 +11,7 @@ import {
   useAgent,
   useCredentials,
   useMcpServers,
-  useWebLLMModel,
+  useLocalModel,
   type AgentChatProps,
   type AgentToolSet,
 } from '@dudko.dev/agent-web-react'
@@ -26,7 +26,8 @@ import { Settings } from './components/Settings'
 import { buildMockCatalog } from './mockCatalog'
 import { isLocal, MODELS } from './models'
 import { useNotesBoard } from './notes'
-import { buildCloudModel, createLocalModel } from './providers'
+import { buildCloudModel } from './cloud'
+import { engineFor } from './local-engines'
 import { RU_LABELS } from './i18n'
 import { Markdown } from './markdown'
 import {
@@ -75,33 +76,54 @@ const initialView = (): View => {
   return VIEWS.includes(hash) ? hash : 'notes'
 }
 
+const CUSTOM_MODEL_KEY = 'agent-web-demo:openrouter-model'
+const readCustomModelId = (fallback: string): string => {
+  try {
+    return localStorage.getItem(CUSTOM_MODEL_KEY) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+const writeCustomModelId = (id: string) => {
+  try {
+    localStorage.setItem(CUSTOM_MODEL_KEY, id)
+  } catch {
+    /* private mode */
+  }
+}
+
 export const App = () => {
   const [modelId, setModelId] = useState('google-flash')
   const model = MODELS.find((m) => m.id === modelId) ?? MODELS[0]
   const local = isLocal(model)
+  // OpenRouter's "any model": the id the user typed (remembered).
+  const [customModelId, setCustomModelId] = useState(() =>
+    readCustomModelId(MODELS.find((m) => m.customModel)?.model ?? ''),
+  )
+  const cloudModelId = model.customModel ? customModelId.trim() || model.model : model.model
 
   const credentials = useCredentials()
-  // Inject a statically-imported WebLLM factory so the weights actually bundle
-  // (the core's dynamic import gets stubbed to an empty module by Vite).
-  const webllm = useWebLLMModel(model.model, {
-    create: createLocalModel,
-    // Loaded with the model's own window, not WebLLM's 4096 default.
-    contextWindowTokens: model.contextWindow,
+  // One hook for every on-device runtime: WebLLM, the browser's built-in model,
+  // transformers.js (local-engines.ts). WebLLM models load with their own
+  // window, not WebLLM's 4096 default.
+  const localModel = useLocalModel(model.model, engineFor(model), {
+    contextWindowTokens: model.runtime === 'web-llm' ? model.contextWindow : undefined,
   })
 
   // Cloud models are built in-app from the vault-stored key and passed to the
-  // agent directly (see providers.ts). Rebuilds when the key or model changes.
+  // agent directly (see cloud.ts). Rebuilds when the key or model changes.
   const [cloudModel, setCloudModel] = useState<LanguageModel | undefined>(undefined)
   useEffect(() => {
-    if (local) {
+    if (local || !model.provider) {
       setCloudModel(undefined)
       return
     }
     let active = true
     credentials.store
       .getApiKey(model.credentialRef!)
-      .then((key) => {
-        if (active) setCloudModel(key ? buildCloudModel(model, key) : undefined)
+      .then(async (key) => {
+        const built = key ? await buildCloudModel(model.provider!, cloudModelId, key) : undefined
+        if (active) setCloudModel(built)
       })
       .catch(() => {
         if (active) setCloudModel(undefined)
@@ -109,13 +131,15 @@ export const App = () => {
     return () => {
       active = false
     }
-  }, [local, model, credentials.store, credentials.version])
-  const resolvedModel = local ? webllm.model : cloudModel
+  }, [local, model, cloudModelId, credentials.store, credentials.version])
+  const resolvedModel = local ? localModel.model : cloudModel
 
   // ── Agent settings shared by every tab ─────────────────────────────────────
   const { settings, update, reset: resetSettings } = useDemoSettings()
   // The window runs must fit: a loaded local model reports its own.
-  const modelWindow = local ? (webllm.contextWindow ?? model.contextWindow) : model.contextWindow
+  const modelWindow = local
+    ? (localModel.contextWindow ?? model.contextWindow)
+    : model.contextWindow
   const { config: settingsConfig, rebuildKey } = useSettingsConfig(settings, modelWindow)
   // The model's memory per conversation. With saved chats it lives in
   // IndexedDB too (keyed by the chat id), so a reopened chat continues with its
@@ -158,6 +182,8 @@ export const App = () => {
     skills: skillsByTab[tab],
     // The consent mode is applied live by useAgent — no rebuild on a switch.
     toolApproval: { mode: settings.approvalMode },
+    // Images, where the core can't tell from the model (built-in, Gemma 4).
+    ...(model.vision ? { vision: true } : {}),
     // Stream the agent's internal phases to the console — handy for poking.
     logLevel: 'debug',
   })
@@ -216,8 +242,9 @@ export const App = () => {
               new Worker(new URL('./chess/analyst.worker.ts', import.meta.url), { type: 'module' }),
             workerConfig: {
               model: {
-                providerType: model.providerType,
-                model: model.model,
+                // The worker builds it with the same builder (cloud.ts).
+                providerType: model.provider as ProviderType,
+                model: cloudModelId,
                 credentialRef: model.credentialRef,
               },
               systemPrompt: ANALYST_PROMPT,
@@ -247,7 +274,7 @@ export const App = () => {
             readOnly: true,
           }),
     }
-  }, [settings.analysts, resolvedModel, local, model, credentials.store, game.tools])
+  }, [settings.analysts, resolvedModel, local, model, cloudModelId, credentials.store, game.tools])
   const chessAgent = useAgent(
     {
       ...base('chess'),
@@ -423,7 +450,12 @@ export const App = () => {
               selected={model}
               onSelect={setModelId}
               credentials={credentials}
-              webllm={webllm}
+              local={localModel}
+              customModelId={customModelId}
+              onCustomModelId={(id) => {
+                setCustomModelId(id)
+                writeCustomModelId(id)
+              }}
               onKeyChange={() => {
                 notesAgent.reload()
                 mcpAgent.reload()

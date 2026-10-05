@@ -217,6 +217,14 @@ export const AgentSettingsPanel = ({
           />{' '}
           Auto-compact the conversation
         </label>
+        <label title="No replanning and no separate final answer: 2 model calls per turn instead of 3+ — the biggest speed-up on a local model, together with Thinking “none”.">
+          <input
+            type="checkbox"
+            checked={settings.fastAnswers}
+            onChange={(e) => update({ fastAnswers: e.target.checked })}
+          />{' '}
+          Fast answers (fewer model calls)
+        </label>
       </div>
 
       <div className="agentset__group">
