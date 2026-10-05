@@ -6,6 +6,7 @@ import {
 } from '@dudko.dev/agent-web-react'
 import {
   allSkills,
+  DEFAULT_WINDOW,
   skillsOfView,
   type DemoSettings,
   type ThinkingChoice,
@@ -17,14 +18,18 @@ export interface AgentSettingsPanelProps {
   settings: DemoSettings
   /** The open tab: its skills are listed, and the notes speak about its tools. */
   view: View
+  /** The model's own window, when known ("auto" uses it). */
+  modelWindow?: number
   update: (patch: Partial<DemoSettings>) => void
   onReset: () => void
 }
 
 const TOKEN_BUDGETS = [0, 20_000, 50_000, 100_000, 250_000]
 const TOOL_CALL_CAPS = [0, 5, 10, 25, 50]
-const WINDOWS = [8_000, 32_000, 128_000, 1_000_000]
-const k = (n: number) => (n >= 1_000_000 ? `${n / 1_000_000}M` : `${n / 1000}k`)
+const WINDOWS = [4_096, 8_000, 32_000, 128_000, 1_000_000]
+// 4096 → 4k, 32768 → 32k, 128000 → 128k.
+const k = (n: number) =>
+  n >= 1_000_000 ? `${n / 1_000_000}M` : `${n % 1024 === 0 ? n / 1024 : Math.round(n / 1000)}k`
 
 /**
  * Everything the agent loop exposes, as settings: tool consent (the autopilot
@@ -34,6 +39,7 @@ const k = (n: number) => (n >= 1_000_000 ? `${n / 1_000_000}M` : `${n / 1000}k`)
 export const AgentSettingsPanel = ({
   settings,
   view,
+  modelWindow,
   update,
   onReset,
 }: AgentSettingsPanelProps) => {
@@ -183,9 +189,11 @@ export const AgentSettingsPanel = ({
             value={settings.contextWindowTokens}
             onChange={(e) => update({ contextWindowTokens: Number(e.target.value) })}
           >
+            <option value={0}>auto ({k(modelWindow ?? DEFAULT_WINDOW)})</option>
             {WINDOWS.map((n) => (
               <option key={n} value={n}>
                 {k(n)}
+                {modelWindow && n > modelWindow ? ' (capped at the model’s)' : ''}
               </option>
             ))}
           </select>
@@ -208,6 +216,14 @@ export const AgentSettingsPanel = ({
             onChange={(e) => update({ autoCompact: e.target.checked })}
           />{' '}
           Auto-compact the conversation
+        </label>
+        <label title="No replanning and no separate final answer: 2 model calls per turn instead of 3+ — the biggest speed-up on a local model, together with Thinking “none”.">
+          <input
+            type="checkbox"
+            checked={settings.fastAnswers}
+            onChange={(e) => update({ fastAnswers: e.target.checked })}
+          />{' '}
+          Fast answers (fewer model calls)
         </label>
       </div>
 

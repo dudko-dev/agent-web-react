@@ -1,3 +1,13 @@
+# 0.0.13 / 2026-10-05
+
+### :tada: Enhancements
+- `useLocalModel(id, engine)`: load any on-device runtime (WebLLM, the browser's built-in model, transformers.js, your own) with progress, switching and unloading; `useWebLLMModel` is it with `createWebLLMEngine`
+- `useWebLLMModel({ contextWindowTokens })` loads a local model with a larger window than WebLLM's 4096 (a different window is a different load); `contextWindow` reports the loaded window
+- Demo — windows: every local model is loaded with its own window and the agent fits its runs into it — no more "Prompt tokens exceed context window size"; the Window setting is "auto" (the model's) by default
+- Demo — models: current Gemini (3.8 Flash, 3.5 Flash-Lite, 3.1 Pro), Claude (Haiku 4.5, Sonnet 5.5, Opus 5.5, Fable 5.1) and GPT-6 (Luna, Sol, Astra); new providers Kimi (K2.6, K3), Groq and Cerebras (fast), Mistral, OpenRouter (any model id); local Gemma 3 1B, Llama 3.2 1B, Ministral 3 3B, Phi-4 mini, Phi-3.5 Vision (WebLLM), Gemini Nano (Chrome's built-in model) and SmolVLM / Gemma 4 E2B (transformers.js); Llama 2 13B removed. Every provider and runtime loads on first use.
+- Demo — speed: "Fast answers" (no replanner and no synthesizer: 2 model calls per turn)
+- Updated dependencies: @dudko.dev/agent-web 0.0.22 (runs fitted to the model's window, local vision models, provider capabilities)
+
 # 0.0.12 / 2026-10-03
 
 ### :tada: Enhancements

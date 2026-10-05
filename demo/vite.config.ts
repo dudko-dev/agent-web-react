@@ -24,9 +24,16 @@ export default defineConfig({
   // The chess analysts run as module Web Workers (`new Worker(new URL(…), {
   // type: 'module' })`) that import the agent core — they need ES output.
   worker: { format: 'es' },
-  // WebLLM and the PDF converter ship their own wasm (found next to their JS
-  // via `new URL(…, import.meta.url)`) and must not be pre-bundled.
+  // WebLLM, transformers.js (onnxruntime-web) and the PDF converter ship their
+  // own wasm (found next to their JS via `new URL(…, import.meta.url)`) and
+  // must not be pre-bundled.
   optimizeDeps: {
-    exclude: ['@browser-ai/web-llm', '@mlc-ai/web-llm', '@dudko.dev/pdf-to-md-core'],
+    exclude: [
+      '@browser-ai/web-llm',
+      '@mlc-ai/web-llm',
+      '@browser-ai/transformers-js',
+      '@huggingface/transformers',
+      '@dudko.dev/pdf-to-md-core',
+    ],
   },
 })

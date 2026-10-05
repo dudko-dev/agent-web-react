@@ -3,7 +3,7 @@ import {
   ApiKeyForm,
   ModelLoadBar,
   type UseCredentialsReturn,
-  type UseWebLLMModelReturn,
+  type UseLocalModelReturn,
 } from '@dudko.dev/agent-web-react'
 import { isLocal, type ModelOption } from '../models'
 
@@ -12,7 +12,11 @@ export interface SettingsProps {
   selected: ModelOption
   onSelect: (id: string) => void
   credentials: UseCredentialsReturn
-  webllm: UseWebLLMModelReturn
+  /** The on-device model loader (WebLLM, built-in, transformers.js). */
+  local: UseLocalModelReturn
+  /** OpenRouter's "any model": the id typed by the user. */
+  customModelId: string
+  onCustomModelId: (id: string) => void
   /** Rebuild the agent after a key changes so it picks up the new credential. */
   onKeyChange: () => void
   /** A usable model is in hand (key stored / local model loaded): start collapsed. */
@@ -20,7 +24,7 @@ export interface SettingsProps {
 }
 
 /**
- * Provider picker + BYOK key entry (cloud) or WebGPU model loader (local).
+ * Provider picker + BYOK key entry (cloud) or on-device model loader (local).
  * Open while there is nothing to talk to; once a key is stored (or a local
  * model loaded) it folds into one line, so the chat gets the height.
  */
@@ -29,7 +33,9 @@ export const Settings = ({
   selected,
   onSelect,
   credentials,
-  webllm,
+  local: loader,
+  customModelId,
+  onCustomModelId,
   onKeyChange,
   ready,
 }: SettingsProps) => {
@@ -40,8 +46,8 @@ export const Settings = ({
   const open = userOpen ?? !ready
   // The local model in GPU memory, when it isn't the selected one.
   const held =
-    webllm.loadedModelId && webllm.loadedModelId !== selected.model
-      ? (models.find((m) => m.model === webllm.loadedModelId)?.label ?? webllm.loadedModelId)
+    loader.loadedModelId && loader.loadedModelId !== selected.model
+      ? (models.find((m) => m.model === loader.loadedModelId)?.label ?? loader.loadedModelId)
       : undefined
   const status = ready ? (local ? 'loaded' : 'key stored ✓') : local ? 'not loaded' : 'add a key'
   return (
@@ -83,18 +89,26 @@ export const Settings = ({
 
       {local ? (
         <div className="settings__local">
-          {!webllm.supported && (
+          {!loader.supported && (
             <p className="settings__warn">
-              WebGPU isn’t available in this browser. Try Chrome or Edge on desktop.
+              {selected.runtime === 'built-in'
+                ? 'This browser has no built-in model — it’s Chrome’s Prompt API (Chrome 148+ on desktop).'
+                : 'WebGPU isn’t available in this browser. Try Chrome or Edge on desktop.'}
             </p>
           )}
-          {webllm.error && <p className="settings__warn">{webllm.error}</p>}
-          {webllm.loading ? (
-            <ModelLoadBar load={{ progress: webllm.progress, text: webllm.text }} />
-          ) : webllm.ready ? (
+          {loader.error && <p className="settings__warn">{loader.error}</p>}
+          {loader.loading ? (
+            <ModelLoadBar load={{ progress: loader.progress, text: loader.text }} />
+          ) : loader.ready ? (
             <div className="settings__row">
-              <p className="settings__ok">Model loaded — chat away, fully offline.</p>
-              <button type="button" className="mcp__btn-ghost" onClick={() => void webllm.unload()}>
+              <p className="settings__ok">
+                Model loaded — chat away, fully offline
+                {loader.contextWindow
+                  ? ` (${Math.round(loader.contextWindow / 1024)}k window)`
+                  : ''}
+                .
+              </p>
+              <button type="button" className="mcp__btn-ghost" onClick={() => void loader.unload()}>
                 Unload
               </button>
             </div>
@@ -102,27 +116,43 @@ export const Settings = ({
             <>
               {held && (
                 <p className="settings__note">
-                  {held} is in GPU memory — loading this one frees it first.
+                  {held} is in memory — loading this one frees it first.
                 </p>
               )}
               <button
                 className="settings__btn"
-                onClick={() => void webllm.load()}
-                disabled={!webllm.supported}
+                onClick={() => void loader.load()}
+                disabled={!loader.supported}
               >
-                Download &amp; load model
+                {selected.runtime === 'built-in'
+                  ? 'Start the built-in model'
+                  : 'Download & load model'}
               </button>
             </>
           )}
         </div>
       ) : (
-        <ApiKeyForm
-          credentials={credentials}
-          credentialRef={selected.credentialRef!}
-          label={selected.keyLabel}
-          placeholder={selected.keyPlaceholder}
-          onChange={onKeyChange}
-        />
+        <>
+          {selected.customModel && (
+            <label className="settings__field">
+              <span className="settings__label">Model id</span>
+              <input
+                className="settings__select"
+                value={customModelId}
+                placeholder={selected.model}
+                spellCheck={false}
+                onChange={(e) => onCustomModelId(e.target.value)}
+              />
+            </label>
+          )}
+          <ApiKeyForm
+            credentials={credentials}
+            credentialRef={selected.credentialRef!}
+            label={selected.keyLabel}
+            placeholder={selected.keyPlaceholder}
+            onChange={onKeyChange}
+          />
+        </>
       )}
 
       {!local && selected.keyUrl && (

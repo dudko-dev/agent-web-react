@@ -2,7 +2,17 @@
 
 A Vite + React app showcasing [`@dudko.dev/agent-web-react`](../): an in-browser
 LLM agent driving tools. Pick a cloud model (bring your own key, stored
-encrypted) or load a local WebGPU model — everything runs in the browser.
+encrypted) or an on-device one — everything runs in the browser.
+
+**Models** (October 2026): Gemini (3.8 Flash, 3.5 Flash-Lite, 3.1 Pro), Claude
+(Haiku 4.5, Sonnet 5.5, Opus 5.5, Fable 5.1), GPT-6 (Luna, Sol, Astra), Kimi
+(K2.6, K3), Groq and Cerebras for speed (GPT-OSS, Qwen3.8 with images), Mistral
+(Small 4, Medium 3.5) and OpenRouter (type any model id). Every one of them
+answers a page directly with your key (CORS). On the device: WebLLM (Gemma 3 1B,
+Llama 3.2 1B/3B, Qwen3.5 0.8B–9B, Ministral 3 3B, Phi-4 mini, Llama 3.1 8B and
+Phi-3.5 Vision for images), Chrome's built-in Gemini Nano (no download), and
+transformers.js (SmolVLM 256M and Gemma 4 E2B, images). Each provider and
+runtime is fetched the first time you pick one of its models.
 
 Three tabs, sharing one "Agent settings" panel:
 
@@ -44,10 +54,19 @@ and in total, thoughts, subagents and consent prompts; the composer has
 attachments, "/" commands, a run timer, the running-agents count, the model +
 thinking chip, the consent chip and a speech-to-text mic.
 
+For quick answers: a fast provider (Groq, Cerebras, Flash-Lite), a small local
+model with Thinking "none", and **Fast answers** in the agent settings (no
+replanner, no separate final answer: 2 model calls per turn instead of 3+).
+
 Local models: pick one and press "Download & load". Switching to another one
 shows it as not loaded (the loaded one stays in memory, so switching back is
 instant); loading it frees the previous model's GPU memory first, and
-"Unload" frees it on demand.
+"Unload" frees it on demand. Each is loaded with its own context window —
+WebLLM's default is 4096 tokens; Qwen3.5 0.8B/2B get 32k, 4B/9B 16k, Llama 3.2
+1B 16k, the rest 8k (each note says the VRAM it takes) — and the agent
+fits its runs into it: compaction, tool lists and tool results are sized from
+the window ("Window: auto"). **Phi-3.5 Vision** is a local multimodal model:
+paste or drop an image and ask about it.
 
 **Live:** https://dudko-dev.github.io/agent-web-react/
 

@@ -254,6 +254,68 @@ test('a setting changed mid-run keeps the run going and applies to the next one'
   expect(calls.every((c) => c.thinkingLevel === 'high')).toBe(true)
 })
 
+test('cloud providers: Kimi and a typed OpenRouter model are called with the user’s key', async ({
+  page,
+}) => {
+  // Record what reaches each API; answer 401 — the wiring is what is tested.
+  const seen: { url: string; auth: string; model: string }[] = []
+  for (const host of ['https://api.moonshot.ai/**', 'https://openrouter.ai/**']) {
+    await page.route(host, async (route) => {
+      const req = route.request()
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204 })
+      seen.push({
+        url: req.url(),
+        auth: req.headers()['authorization'] ?? '',
+        model: (req.postDataJSON() as { model?: string } | null)?.model ?? '',
+      })
+      await route.fulfill({
+        status: 401,
+        headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+        body: JSON.stringify({
+          error: { message: 'Invalid API key', type: 'invalid_request_error' },
+        }),
+      })
+    })
+  }
+  await page.goto('/')
+  const picker = page.locator('.settings select').first()
+  await picker.selectOption('kimi-k2_6')
+  await page.getByPlaceholder('sk-…').fill('sk-kimi-test')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await send(page, 'hello')
+  await expect.poll(() => seen.length).toBeGreaterThan(0)
+  expect(seen[0].url).toContain('api.moonshot.ai/v1')
+  expect(seen[0].auth).toBe('Bearer sk-kimi-test')
+  expect(seen[0].model).toBe('kimi-k2.6')
+  await expect(page.locator('.awr-msg--error, .awr-msg__error').first()).toBeVisible()
+
+  seen.length = 0
+  await page.locator('.settings__summary').click()
+  await picker.selectOption('openrouter-custom')
+  await page.getByLabel('Model id').fill('zai-org/glm-5.3')
+  await page.getByPlaceholder('sk-or-…').fill('sk-or-test')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await send(page, 'hello again')
+  await expect.poll(() => seen.length).toBeGreaterThan(0)
+  expect(seen[0].url).toContain('openrouter.ai/api/v1')
+  expect(seen[0].auth).toBe('Bearer sk-or-test')
+  expect(seen[0].model).toBe('zai-org/glm-5.3')
+})
+
+test('fast answers: the step’s reply is the answer — no synthesizer call', async ({ page }) => {
+  const calls = await mockGemini(page, (c) =>
+    c.stage === 'planner' ? plan('Say hi') : { text: 'Hi from the step.' },
+  )
+  await openWithKey(page)
+  await page.locator('.agentset__title').click()
+  await page.getByLabel('Fast answers (fewer model calls)').check()
+  await send(page, 'hello')
+  await expect(page.locator('.awr-msg--assistant .awr-msg__bubble')).toContainText(
+    'Hi from the step.',
+  )
+  expect(calls.map((c) => c.stage)).toEqual(['planner', 'executor'])
+})
+
 test('labels: every text of the chat can be swapped (Russian)', async ({ page }) => {
   await mockGemini(page, () => ({ text: 'ok' }))
   await openWithKey(page)
