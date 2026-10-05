@@ -229,6 +229,17 @@ function LocalAgent() {
 > yet. The previous model stays in memory (`loadedModelId`; switching back is
 > instant) until the new one is loaded — that frees it first, so two models
 > never share the GPU — or until `unload()`.
+>
+> **Context window.** WebLLM loads its models with a 4096-token window, far
+> below what Qwen3 or Llama 3.x were trained on. Pass `contextWindowTokens` to
+> load with more (it costs KV-cache VRAM, not a new download); your `create`
+> factory receives it and applies it with the core's `withWebLLMContextWindow`
+> (see the demo's `providers.ts`). `local.contextWindow` is the window the model
+> was loaded with, and the agent fits its runs into it on its own — compaction,
+> tool lists and tool results are sized from it.
+>
+> **Vision.** `Phi-3.5-vision-instruct-q4f16_1-MLC` takes images (paste, drop
+> or attach them) — a multimodal model that never sends them anywhere.
 
 ## Models in a bundler (Vite, Next, CRA)
 

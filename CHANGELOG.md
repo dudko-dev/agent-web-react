@@ -1,3 +1,10 @@
+# 0.0.13 / 2026-10-05
+
+### :tada: Enhancements
+- `useWebLLMModel({ contextWindowTokens })` loads a local model with a larger window than WebLLM's 4096 (a different window is a different load); `contextWindow` reports the loaded window
+- Demo: every local model is loaded with its own window (Qwen3.5 0.8B/2B 32k, 4B/9B 16k, Llama 3.x 8k, Llama 2 13B 4k) and the agent fits its runs into it — no more "Prompt tokens exceed context window size"; the Window setting is "auto" (the model's) by default; a local multimodal model, Phi-3.5 Vision
+- Updated dependencies: @dudko.dev/agent-web 0.0.22 (runs fitted to the model's window, local vision models)
+
 # 0.0.12 / 2026-10-03
 
 ### :tada: Enhancements

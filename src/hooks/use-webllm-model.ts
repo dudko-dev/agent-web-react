@@ -4,6 +4,7 @@ import {
   isWebGPUAvailable,
   preloadWebLLMModel,
   unloadWebLLMModel,
+  webLLMContextWindow,
   type WebLLMModelOptions,
 } from '@dudko.dev/agent-web'
 import { errMessage } from '../util.js'
@@ -68,12 +69,21 @@ export interface UseWebLLMModelReturn {
   supported: boolean
   /** True once the current `modelId` is ready. */
   ready: boolean
+  /**
+   * The loaded model's context window, in tokens (WebLLM's default is 4096;
+   * see the `contextWindowTokens` option). The agent reads it too.
+   */
+  contextWindow: number | undefined
 }
 
 interface Loaded {
   id: string
+  /** The id and the window it was loaded with: another window is another load. */
+  key: string
   model: WebLLMModel
 }
+
+const keyOf = (id: string, tokens: number | undefined) => (tokens ? `${id}@${tokens}` : id)
 
 /**
  * Load a local WebGPU model with WebLLM and track its download progress.
@@ -87,6 +97,10 @@ interface Loaded {
  * yet), while the previous model stays in memory — switching back is instant.
  * Loading the new id frees the previous one first, so two models never hold
  * GPU memory at once; `unload()` frees it on demand.
+ *
+ * WebLLM loads its models with a 4096-token window; pass `contextWindowTokens`
+ * to load with more (Qwen3, Llama 3.x take far more — it costs KV-cache VRAM,
+ * not a new download). A different window is a different load.
  *
  * ```tsx
  * import { webLLM } from '@browser-ai/web-llm' // your app's optional peer
@@ -102,15 +116,17 @@ export const useWebLLMModel = (
   options?: UseWebLLMModelOptions,
 ): UseWebLLMModelReturn => {
   const [loaded, setLoaded] = useState<Loaded | undefined>(undefined)
-  const [pending, setPending] = useState<{ id: string; progress: number; text: string }>()
-  const [failure, setFailure] = useState<{ id: string; message: string }>()
+  const [pending, setPending] = useState<{ key: string; progress: number; text: string }>()
+  const [failure, setFailure] = useState<{ key: string; message: string }>()
   const optionsRef = useRef(options)
   optionsRef.current = options
   // The source of truth for async code (state lags a render behind).
   const loadedRef = useRef<Loaded | undefined>(undefined)
-  const inflightRef = useRef<{ id: string; promise: Promise<WebLLMModel | undefined> } | undefined>(
-    undefined,
-  )
+  const inflightRef = useRef<
+    { key: string; promise: Promise<WebLLMModel | undefined> } | undefined
+  >(undefined)
+  const windowTokens = options?.contextWindowTokens
+  const key = keyOf(modelId, windowTokens)
   // Bumped by every load()/unload(): an older load that finishes late is stale.
   const seqRef = useRef(0)
 
@@ -121,16 +137,16 @@ export const useWebLLMModel = (
 
   const load = useCallback((): Promise<WebLLMModel | undefined> => {
     const id = modelId
-    if (loadedRef.current?.id === id) return Promise.resolve(loadedRef.current.model)
-    if (inflightRef.current?.id === id) return inflightRef.current.promise
+    if (loadedRef.current?.key === key) return Promise.resolve(loadedRef.current.model)
+    if (inflightRef.current?.key === key) return inflightRef.current.promise
     if (!isWebGPUAvailable()) {
-      setFailure({ id, message: 'WebGPU is not available in this browser.' })
+      setFailure({ key, message: 'WebGPU is not available in this browser.' })
       return Promise.resolve(undefined)
     }
     const seq = ++seqRef.current
     const current = () => seq === seqRef.current
     const promise = (async (): Promise<WebLLMModel | undefined> => {
-      setPending({ id, progress: 0, text: '' })
+      setPending({ key, progress: 0, text: '' })
       setFailure(undefined)
       let built: WebLLMModel | undefined
       try {
@@ -148,7 +164,7 @@ export const useWebLLMModel = (
           // factory (e.g. a statically-imported `webLLM`, needed under bundlers).
           preload: false,
           initProgressCallback: (report) => {
-            if (current()) setPending({ id, progress: report.progress, text: report.text })
+            if (current()) setPending({ key, progress: report.progress, text: report.text })
             modelOptions.initProgressCallback?.(report)
           },
         })
@@ -162,11 +178,11 @@ export const useWebLLMModel = (
           await unloadWebLLMModel(built)
           return undefined
         }
-        setHeld({ id, model: built })
+        setHeld({ id, key, model: built })
         return built
       } catch (err) {
         if (built) await unloadWebLLMModel(built)
-        if (current()) setFailure({ id, message: errMessage(err) })
+        if (current()) setFailure({ key, message: errMessage(err) })
         return undefined
       } finally {
         if (current()) {
@@ -175,9 +191,9 @@ export const useWebLLMModel = (
         }
       }
     })()
-    inflightRef.current = { id, promise }
+    inflightRef.current = { key, promise }
     return promise
-  }, [modelId])
+  }, [modelId, key])
 
   const unload = useCallback(async (): Promise<void> => {
     seqRef.current++ // a load in flight becomes stale and frees itself
@@ -188,8 +204,8 @@ export const useWebLLMModel = (
     if (previous) await unloadWebLLMModel(previous.model)
   }, [])
 
-  const model = loaded?.id === modelId ? loaded.model : undefined
-  const progressing = pending?.id === modelId ? pending : undefined
+  const model = loaded?.key === key ? loaded.model : undefined
+  const progressing = pending?.key === key ? pending : undefined
   return {
     model,
     load,
@@ -198,8 +214,9 @@ export const useWebLLMModel = (
     loading: progressing !== undefined,
     progress: progressing?.progress ?? 0,
     text: progressing?.text ?? '',
-    error: failure?.id === modelId ? failure.message : undefined,
+    error: failure?.key === key ? failure.message : undefined,
     supported: isWebGPUAvailable(),
     ready: model !== undefined,
+    contextWindow: model ? webLLMContextWindow(model) : undefined,
   }
 }

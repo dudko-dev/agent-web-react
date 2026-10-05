@@ -2,6 +2,8 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { webLLM } from '@browser-ai/web-llm'
+import { prebuiltAppConfig } from '@mlc-ai/web-llm'
+import { withWebLLMContextWindow } from '@dudko.dev/agent-web'
 import type { LanguageModel } from 'ai'
 import type { WebLLMModelFactory } from '@dudko.dev/agent-web-react'
 import type { ModelOption } from './models'
@@ -42,5 +44,19 @@ export const buildCloudModel = (model: ModelOption, apiKey: string): LanguageMod
  * an empty module by Vite, which surfaces at runtime as `webLLM is not a
  * function`.
  */
-export const createLocalModel: WebLLMModelFactory = (modelId, options) =>
-  Promise.resolve(webLLM(modelId, options as never) as never)
+export const createLocalModel: WebLLMModelFactory = (modelId, options) => {
+  // WebLLM loads its models with a 4096-token window; load with the model's
+  // own (see models.ts). It goes in engineConfig.appConfig — @browser-ai/web-llm
+  // ignores its top-level `appConfig` setting.
+  const { contextWindowTokens, ...rest } = options ?? {}
+  const settings = contextWindowTokens
+    ? {
+        ...rest,
+        engineConfig: {
+          ...(rest.engineConfig as object | undefined),
+          appConfig: withWebLLMContextWindow(prebuiltAppConfig, modelId, contextWindowTokens),
+        },
+      }
+    : rest
+  return Promise.resolve(webLLM(modelId, settings as never) as never)
+}

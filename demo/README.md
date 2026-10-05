@@ -47,7 +47,12 @@ thinking chip, the consent chip and a speech-to-text mic.
 Local models: pick one and press "Download & load". Switching to another one
 shows it as not loaded (the loaded one stays in memory, so switching back is
 instant); loading it frees the previous model's GPU memory first, and
-"Unload" frees it on demand.
+"Unload" frees it on demand. Each is loaded with its own context window —
+WebLLM's default is 4096 tokens; Qwen3.5 0.8B/2B get 32k, 4B/9B 16k, Llama 3.x
+8k, Llama 2 13B its native 4k (each note says the VRAM it takes) — and the agent
+fits its runs into it: compaction, tool lists and tool results are sized from
+the window ("Window: auto"). **Phi-3.5 Vision** is a local multimodal model:
+paste or drop an image and ask about it.
 
 **Live:** https://dudko-dev.github.io/agent-web-react/
 

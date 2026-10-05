@@ -22,6 +22,7 @@ export interface DemoSettings {
   /** Tool-calling rounds inside one step. */
   maxStepsPerTask: number
   autoCompact: boolean
+  /** The window compaction works with; 0 = the model's own (auto). */
   contextWindowTokens: number
   /** Names of enabled skills (built-in and custom). */
   enabledSkills: string[]
@@ -48,7 +49,7 @@ export const DEFAULT_SETTINGS: DemoSettings = {
   maxIterations: 6,
   maxStepsPerTask: 4,
   autoCompact: true,
-  contextWindowTokens: 128_000,
+  contextWindowTokens: 0,
   enabledSkills: BUILTIN_SKILLS.map((s) => s.name),
   customSkills: [],
   analysts: 'off',
@@ -102,7 +103,12 @@ export const enabledSkillsFor = (s: DemoSettings, view: View): Skill[] =>
  * a setting that is baked in at createAgent changes (the consent mode is NOT
  * in it — the hook applies that one live, mid-run even).
  */
-export const useSettingsConfig = (s: DemoSettings) => {
+/** The model's window when it is known (local models: the one they are loaded with). */
+export const DEFAULT_WINDOW = 128_000
+
+export const useSettingsConfig = (s: DemoSettings, modelWindow: number | undefined) => {
+  // Auto = the model's window; the agent never goes above a local model's anyway.
+  const window = s.contextWindowTokens || modelWindow || DEFAULT_WINDOW
   const baked = {
     thinking: s.thinking,
     maxTotalTokens: s.maxTotalTokens,
@@ -110,7 +116,7 @@ export const useSettingsConfig = (s: DemoSettings) => {
     maxIterations: s.maxIterations,
     maxStepsPerTask: s.maxStepsPerTask,
     autoCompact: s.autoCompact,
-    contextWindowTokens: s.contextWindowTokens,
+    contextWindowTokens: window,
   }
   const rebuildKey = JSON.stringify(baked)
   const config = useMemo<Partial<BrowserAgentConfig>>(
@@ -122,9 +128,9 @@ export const useSettingsConfig = (s: DemoSettings) => {
       maxStepsPerTask: s.maxStepsPerTask,
       compaction: {
         auto: s.autoCompact,
-        contextWindowTokens: s.contextWindowTokens,
+        contextWindowTokens: window,
         // Small on purpose so the demo shows compaction within a few turns.
-        thresholdTokens: Math.min(6_000, Math.floor(s.contextWindowTokens / 2)),
+        thresholdTokens: Math.min(6_000, Math.floor(window / 2)),
         keepRecentTurns: 4,
       },
     }),

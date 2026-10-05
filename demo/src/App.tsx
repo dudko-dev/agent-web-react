@@ -83,7 +83,11 @@ export const App = () => {
   const credentials = useCredentials()
   // Inject a statically-imported WebLLM factory so the weights actually bundle
   // (the core's dynamic import gets stubbed to an empty module by Vite).
-  const webllm = useWebLLMModel(model.model, { create: createLocalModel })
+  const webllm = useWebLLMModel(model.model, {
+    create: createLocalModel,
+    // Loaded with the model's own window, not WebLLM's 4096 default.
+    contextWindowTokens: model.contextWindow,
+  })
 
   // Cloud models are built in-app from the vault-stored key and passed to the
   // agent directly (see providers.ts). Rebuilds when the key or model changes.
@@ -110,7 +114,9 @@ export const App = () => {
 
   // ── Agent settings shared by every tab ─────────────────────────────────────
   const { settings, update, reset: resetSettings } = useDemoSettings()
-  const { config: settingsConfig, rebuildKey } = useSettingsConfig(settings)
+  // The window runs must fit: a loaded local model reports its own.
+  const modelWindow = local ? (webllm.contextWindow ?? model.contextWindow) : model.contextWindow
+  const { config: settingsConfig, rebuildKey } = useSettingsConfig(settings, modelWindow)
   // The model's memory per conversation. With saved chats it lives in
   // IndexedDB too (keyed by the chat id), so a reopened chat continues with its
   // context; the chess game is not saved, so its memory isn't either.
@@ -428,6 +434,7 @@ export const App = () => {
             <AgentSettingsPanel
               settings={settings}
               view={view}
+              modelWindow={modelWindow}
               update={update}
               onReset={resetSettings}
             />

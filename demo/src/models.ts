@@ -16,6 +16,12 @@ export interface ModelOption {
   keyUrl?: string
   /** A short note about direct-browser BYOK reliability / CORS / download size. */
   note: string
+  /**
+   * The context window, in tokens. For local models it is the window the model
+   * is LOADED with (WebLLM's default is 4096; more costs KV-cache VRAM, not a
+   * download). The agent fits its runs into it; unset = 128k.
+   */
+  contextWindow?: number
 }
 
 // Shared per-provider key metadata (all tiers of a provider use one key).
@@ -143,7 +149,8 @@ export const MODELS: ModelOption[] = [
     label: 'Qwen3.5 0.8B — ~0.6 GB',
     providerType: 'web-llm',
     model: 'Qwen3.5-0.8B-q4f16_1-MLC',
-    note: 'Tiny & quick to download. Runs entirely on your GPU via WebLLM — no key, fully private. Needs WebGPU (Chrome/Edge).',
+    contextWindow: 32_768,
+    note: 'Tiny & quick to download. Loaded with a 32k window (WebLLM defaults to 4k) — ~2 GB of VRAM. Runs entirely on your GPU via WebLLM — no key, fully private. Needs WebGPU (Chrome/Edge).',
   },
   {
     id: 'local-qwen-2b',
@@ -151,7 +158,8 @@ export const MODELS: ModelOption[] = [
     label: 'Qwen3.5 2B — ~1.5 GB',
     providerType: 'web-llm',
     model: 'Qwen3.5-2B-q4f16_1-MLC',
-    note: 'Small & capable for tools. Runs entirely on your GPU via WebLLM — no key, fully private. Needs WebGPU (Chrome/Edge).',
+    contextWindow: 32_768,
+    note: 'Small & capable for tools. Loaded with a 32k window — ~2.6 GB of VRAM. Runs entirely on your GPU via WebLLM — no key, fully private. Needs WebGPU (Chrome/Edge).',
   },
   {
     id: 'local-llama-3b',
@@ -159,7 +167,8 @@ export const MODELS: ModelOption[] = [
     label: 'Llama 3.2 3B — ~2 GB',
     providerType: 'web-llm',
     model: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',
-    note: 'A well-rounded 3B. Runs entirely on your GPU via WebLLM — no key, fully private. Needs WebGPU (Chrome/Edge).',
+    contextWindow: 8_192,
+    note: 'A well-rounded 3B. Loaded with an 8k window — ~2.7 GB of VRAM. Runs entirely on your GPU via WebLLM — no key, fully private. Needs WebGPU (Chrome/Edge).',
   },
   {
     id: 'local-qwen-4b',
@@ -167,7 +176,17 @@ export const MODELS: ModelOption[] = [
     label: 'Qwen3.5 4B — ~2.7 GB',
     providerType: 'web-llm',
     model: 'Qwen3.5-4B-q4f16_1-MLC',
-    note: 'Stronger reasoning at a mid size. Runs entirely on your GPU via WebLLM — no key. Needs WebGPU + a few GB of VRAM.',
+    contextWindow: 16_384,
+    note: 'Stronger reasoning at a mid size. Loaded with a 16k window — ~4.3 GB of VRAM. Runs entirely on your GPU via WebLLM — no key. Needs WebGPU.',
+  },
+  {
+    id: 'local-phi-vision',
+    group: 'Local · WebGPU (no key)',
+    label: 'Phi-3.5 Vision 4B — images · ~2.4 GB',
+    providerType: 'web-llm',
+    model: 'Phi-3.5-vision-instruct-q4f16_1-MLC',
+    contextWindow: 8_192,
+    note: 'A local multimodal model: paste, drop or attach an image and ask about it — it never leaves your device. Loaded with an 8k window (an image takes ~750 tokens) — ~5.5 GB of VRAM. Needs WebGPU.',
   },
   {
     id: 'local-llama-8b',
@@ -175,7 +194,8 @@ export const MODELS: ModelOption[] = [
     label: 'Llama 3.1 8B — ~5 GB',
     providerType: 'web-llm',
     model: 'Llama-3.1-8B-Instruct-q4f16_1-MLC',
-    note: 'Large local model. Runs on your GPU via WebLLM — no key. A ~5 GB one-time download; needs WebGPU + ~6 GB of VRAM.',
+    contextWindow: 8_192,
+    note: 'Large local model. Loaded with an 8k window. Runs on your GPU via WebLLM — no key. A ~5 GB one-time download; needs WebGPU + ~5.5 GB of VRAM.',
   },
   {
     id: 'local-qwen-9b',
@@ -183,7 +203,8 @@ export const MODELS: ModelOption[] = [
     label: 'Qwen3.5 9B — ~6 GB',
     providerType: 'web-llm',
     model: 'Qwen3.5-9B-q4f16_1-MLC',
-    note: 'A strong ~9B local model. Runs on your GPU via WebLLM — no key. A ~6 GB download; needs WebGPU + ample VRAM.',
+    contextWindow: 16_384,
+    note: 'A strong ~9B local model. Loaded with a 16k window — ~6.8 GB of VRAM. Runs on your GPU via WebLLM — no key. A ~6 GB download.',
   },
   {
     id: 'local-llama-13b',
@@ -191,7 +212,8 @@ export const MODELS: ModelOption[] = [
     label: 'Llama 2 13B — ~7 GB',
     providerType: 'web-llm',
     model: 'Llama-2-13b-chat-hf-q4f16_1-MLC',
-    note: 'The largest local model here (13B). Runs on your GPU via WebLLM — no key. A ~7 GB download; needs WebGPU + a lot of VRAM (~10 GB).',
+    contextWindow: 4_096,
+    note: 'The largest local model here (13B), and the oldest: its window is 4k (all it was trained on), so long chats get compacted often. A ~7 GB download; needs WebGPU + ~12 GB of VRAM.',
   },
 ]
 
