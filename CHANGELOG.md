@@ -1,3 +1,8 @@
+# 0.0.14 / 2026-10-10
+
+### :tada: Enhancements
+- Updated dependencies: @modelcontextprotocol/sdk, @playwright/test
+
 # 0.0.13 / 2026-10-05
 
 ### :tada: Enhancements
