@@ -1,3 +1,8 @@
+# 0.0.15 / 2026-10-17
+
+### :tada: Enhancements
+- Updated dependencies: @dudko.dev/agent-web, @playwright/test, prettier, react, react-dom, tsup
+
 # 0.0.14 / 2026-10-10
 
 ### :tada: Enhancements
