@@ -20,17 +20,17 @@
     "@browser-ai/core": "^3.0.4",
     "@browser-ai/transformers-js": "^3.0.4",
     "@browser-ai/web-llm": "^3.0.4",
-    "@dudko.dev/agent-web": "^0.0.23",
+    "@dudko.dev/agent-web": "^0.0.24",
     "@dudko.dev/pdf-to-md-core": "^0.3.5",
     "@huggingface/transformers": "^4.3.0",
     "@mlc-ai/web-llm": "^0.2.85",
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "ai": "^7.0.143",
     "chess.js": "^1.4.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
