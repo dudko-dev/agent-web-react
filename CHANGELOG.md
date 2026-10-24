@@ -1,3 +1,8 @@
+# 0.0.16 / 2026-10-24
+
+### :tada: Enhancements
+- Updated dependencies: @dudko.dev/agent-web, @modelcontextprotocol/sdk
+
 # 0.0.15 / 2026-10-17
 
 ### :tada: Enhancements
