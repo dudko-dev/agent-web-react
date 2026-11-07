@@ -1,3 +1,8 @@
+# 0.0.18 / 2026-11-07
+
+### :tada: Enhancements
+- Updated dependencies: @dudko.dev/agent-web, @playwright/test
+
 # 0.0.17 / 2026-10-31
 
 ### :tada: Enhancements
