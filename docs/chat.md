@@ -110,6 +110,7 @@ full size) and file chips. The header shows the conversation's total.
 | `files` | save attachments into a `VirtualFileSystem` under `/attachments/` |
 | `dropZone` | `'self'` (default), `'window'`, or a ref (`<AgentChat>` passes its panel) |
 | `speech` | `false`, or `{ lang }` |
+| `steering` / `showQueued` | typing to the agent while it works; the queue strips ([below](#talking-to-the-agent-while-it-works)) |
 | `showTimer` / `showAgents` / `showApprovalMode` / `showNotices` | toolbar parts |
 | `toolbarExtra` / `toolbarEnd` | your own toolbar content |
 | `renderAttachment` | render a pending attachment chip yourself |
@@ -118,6 +119,53 @@ full size) and file chips. The header shows the conversation's total.
 Speech to text uses `SpeechRecognition` / `webkitSpeechRecognition` (Chrome,
 Edge, Safari). In Chrome the audio is recognised by Google's service; the mic
 button only appears where the API exists.
+
+## Talking to the agent while it works
+
+The input stays live during a run. Text typed then is **said to the running agent** (the
+send button, or Enter): it is shown to the model at the next boundary — between tool
+calls, or when the step ends, where the replanner re-checks the plan against it. It never
+cuts a tool call short. Needs `@dudko.dev/agent-web` with `createRunControl` (see the
+core's [steering docs](https://github.com/dudko-dev/agent-web/blob/main/docs/capabilities.md)).
+
+What the user sees:
+
+- a message waiting for a boundary shows above the input as **queued** ("waiting for the
+  agent's next step");
+- once the agent has it, the queue entry becomes a **note** under the step it reached —
+  "you said, between tool calls" / "after this step" / "before the answer". It is a note
+  on that run, not a new turn, and it is saved with the chat;
+- a message that arrives too late for the run (while the answer is being written) is
+  **sent as the next message** when the run ends (`followUp`, default on);
+- **Stop** does not send behind the user's back: whatever the run never showed the agent
+  is offered above the input — "Not delivered (1 message)" with **Send now** / **Discard**;
+- every running **subagent** gets a stop button (and shows its profile, when the parent
+  chose one). Stopping one fails only that delegation — the parent model is told and
+  routes around it; the run and its siblings go on. It then shows as "stopped".
+- files cannot join a run that is going (they are sent with the next message) — the
+  composer says so instead of dropping them.
+
+```tsx
+const agent = useAgent(config)
+agent.send('use the staging database') // false: no run in flight (or empty) — use run()
+agent.stopSubagent(agent.subagents.find((s) => s.status === 'running')!.id)
+agent.queued // [{ id, text }] — sent, not yet shown to the model
+agent.notes // [{ id, text, at: 'round' | 'step' | 'final', stepId? }] — shown, and where
+agent.undelivered // string[] — a stopped run's leftovers; sendUndelivered() / discardUndelivered()
+```
+
+| Prop / option | |
+| --- | --- |
+| `steering` (composer, default true) | off: the input does nothing during a run, as before |
+| `showQueued` (composer, default true) | the queue and "not delivered" strips |
+| `showNotes` (chat / message list / step list, default true) | the notes under the steps |
+| `stoppableSubagents` (chat, default true) | the stop button on running subagents |
+| `followUp` (`useAgent` option, default true) | send what a run never showed the agent as the next message |
+| `onStopSubagent` (message list / step list) | wire your own stop button (`useAgent().stopSubagent`) |
+
+Labels: `placeholderBusy`, `steer`, `noAttachmentsWhileBusy`, `queuedWaiting`, `noteAt`,
+`undelivered`, `sendUndelivered`, `discardUndelivered`, `stopSubagent`, `subagentStopped`.
+A replan caused by a message has `replan.byUser === true`.
 
 ## Attachments: images, PDFs, files, URLs
 
@@ -231,7 +279,7 @@ tokens inside an element with class `awr-theme`.
 
 | | |
 | --- | --- |
-| `useAgent` | the agent, its UI state, `run(goal, { images, files, attachments, label })`, consent, `compact`, `sessionId`, `loadChat` |
+| `useAgent` | the agent, its UI state, `run(goal, { images, files, attachments, label })`, `send` / `stopSubagent` (steer a running agent), consent, `compact`, `sessionId`, `loadChat` |
 | `useChatHistory` | saved chats over a `ChatHistoryStore` |
 | `useVirtualFiles` | a live listing of a `VirtualFileSystem` + upload / remove / read |
 | `useSpeechToText` | Web Speech API: `{ supported, listening, interim, start, stop, toggle }` |

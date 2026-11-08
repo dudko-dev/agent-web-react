@@ -170,6 +170,7 @@ function Custom() {
 | --- | --- |
 | `run(goal, { images, files, attachments, label })` | Start a run (with attachments); resolves with the `RunResult` |
 | `stop()` | Abort the in-flight run |
+| `send(text)`, `stopSubagent(id)` | Say something to the running agent (shown to the model at its next boundary; the replanner re-checks the plan) / stop one subagent. `queued`, `notes` and `undelivered` show where a message is — see [docs/chat.md](docs/chat.md#talking-to-the-agent-while-it-works) |
 | `reset()` | Clear the whole conversation (and the agent's memory of it) |
 | `reload()` | Rebuild the agent (e.g. after storing a new key) |
 | `status` | `idle` \| `initializing` \| `ready` \| `running` \| `error` |
