@@ -103,6 +103,24 @@ export interface AgentLabels {
   consentAllowed: string
   consentDenied: (reason?: string) => string
 
+  // ── steering a run that is going ───────────────────────────────────────────
+  /** Composer placeholder while the agent works (what you type is sent to it). */
+  placeholderBusy: string
+  /** The send button while the agent works. */
+  steer: string
+  /** Shown when files are attached while the agent works (they can't be added then). */
+  noAttachmentsWhileBusy: string
+  /** A message waiting to reach the agent. */
+  queuedWaiting: string
+  /** Where a note landed: between tool calls / after a step / before the answer. */
+  noteAt: Record<'round' | 'step' | 'final', string>
+  /** Messages the run ended without delivering, offered for sending. */
+  undelivered: (n: number) => string
+  sendUndelivered: string
+  discardUndelivered: string
+  stopSubagent: string
+  subagentStopped: string
+
   // ── steps / tool calls ─────────────────────────────────────────────────────
   failed: string
   toolCostTitle: string
@@ -225,6 +243,22 @@ export const defaultLabels: AgentLabels = {
   consentAllowed: 'allowed',
   consentDenied: (reason) => `denied${reason ? ` — ${reason}` : ''}`,
 
+  placeholderBusy: 'Tell the agent something while it works…',
+  steer: 'Send to the agent',
+  noAttachmentsWhileBusy:
+    'Files can’t be added while the agent is working — send them with your next message.',
+  queuedWaiting: 'waiting for the agent’s next step',
+  noteAt: {
+    round: 'you said, between tool calls',
+    step: 'you said, after this step',
+    final: 'you said, before the answer',
+  },
+  undelivered: (n) => `Not delivered (${plural(n, 'message', 'messages')})`,
+  sendUndelivered: 'Send now',
+  discardUndelivered: 'Discard',
+  stopSubagent: 'Stop this subagent',
+  subagentStopped: 'stopped',
+
   failed: 'failed',
   toolCostTitle:
     "Estimated tokens of the arguments and of the result fed back to the model (chars / 4), and the call's duration",
@@ -251,6 +285,7 @@ const NESTED = [
   'commandGroups',
   'commandDescriptions',
   'thinkingLevels',
+  'noteAt',
 ] as const
 
 /** `base` with `over` applied (nested groups merged, not replaced). */

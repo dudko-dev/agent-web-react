@@ -29,6 +29,36 @@ export const parseSlash = (text: string): { name: string; args: string } | undef
   return m ? { name: m[1].toLowerCase(), args: (m[2] ?? '').trim() } : undefined
 }
 
+/** What pressing Enter does while the agent is working (see {@link steerIntent}). */
+export type SteerIntent =
+  /** The agent is idle: submit as usual. */
+  | 'idle'
+  /** Say it to the running agent. */
+  | 'steer'
+  /** There are attachments, which cannot be added to a run that is going. */
+  | 'attachments'
+  /** Nothing to do (empty, a slash command, or steering is switched off). */
+  | 'ignore'
+
+/**
+ * Decide what Enter means while the agent works: text goes to the running agent,
+ * files cannot (they are sent with the next message), a "/command" is not a message,
+ * and a host that switched steering off gets the old behaviour (nothing happens).
+ */
+export const steerIntent = (input: {
+  /** The trimmed text. */
+  raw: string
+  busy: boolean
+  steering: boolean
+  hasAttachments: boolean
+}): SteerIntent => {
+  if (!input.busy) return 'idle'
+  if (!input.steering) return 'ignore'
+  if (!input.raw && !input.hasAttachments) return 'ignore'
+  if (parseSlash(input.raw)) return 'ignore'
+  return input.hasAttachments ? 'attachments' : 'steer'
+}
+
 /** Commands matching what was typed after "/" — name prefix first, then substring. */
 export const filterCommands = (commands: SlashCommand[], query: string): SlashCommand[] => {
   const q = query.toLowerCase()

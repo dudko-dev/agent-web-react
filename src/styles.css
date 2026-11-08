@@ -1292,6 +1292,105 @@
 .awr-composer2--compact .awr-tchip {
   padding: 0 6px;
 }
+/* ── steering a run that is going ─────────────────────────────────────────── */
+.awr-subagent__profile {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--awr-border);
+  border-radius: 999px;
+  color: var(--awr-muted);
+  font-size: 11px;
+  line-height: 18px;
+}
+.awr-subagent__stop {
+  flex: none;
+  margin-left: auto;
+  color: var(--awr-danger);
+}
+.awr-subagent--stopped .awr-subagent__activity {
+  color: var(--awr-warn);
+}
+.awr-notes {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.awr-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--awr-accent);
+  border-radius: 0 6px 6px 0;
+  background: var(--awr-subtle);
+  font-size: 12.5px;
+}
+.awr-note__icon {
+  flex: none;
+  align-self: center;
+  color: var(--awr-accent);
+}
+.awr-note__where {
+  flex: none;
+  color: var(--awr-muted);
+}
+.awr-note__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  quotes: none;
+}
+.awr-step--notes {
+  border: 0;
+  padding-top: 0;
+}
+.awr-queued {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.awr-queued__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px dashed var(--awr-border);
+  border-radius: 8px;
+  background: var(--awr-subtle);
+  font-size: 12.5px;
+}
+.awr-queued__item--undelivered {
+  border-color: var(--awr-warn);
+}
+.awr-queued__icon {
+  flex: none;
+  color: var(--awr-muted);
+}
+.awr-queued__item--undelivered .awr-queued__icon {
+  color: var(--awr-warn);
+}
+.awr-queued__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.awr-queued__state {
+  flex: none;
+  color: var(--awr-muted);
+}
+.awr-linkbtn {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--awr-accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
 @media (max-width: 480px) {
   .awr-msg__col,
   .awr-msg--assistant .awr-msg__col {

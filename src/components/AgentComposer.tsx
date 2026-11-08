@@ -8,6 +8,7 @@ import {
   formatElapsed,
   noticesOf,
   parseSlash,
+  steerIntent,
   withAttachments,
   type ComposerAttachment,
   type SlashCommand,
@@ -18,6 +19,7 @@ import { downscaleImage } from '../image-resize.js'
 import { useLabels, type AgentLabels, type AgentLabelsOverride } from '../labels.js'
 import type { ChatAttachment } from '../types.js'
 import {
+  AlertIcon,
   BoltIcon,
   BotIcon,
   ClockIcon,
@@ -119,6 +121,14 @@ export interface AgentComposerProps {
   showApprovalMode?: boolean
   /** Banners for limits, compaction and errors above the input (default true). */
   showNotices?: boolean
+  /**
+   * Let the user type to the agent while it works (default true): Enter sends the text
+   * to the running agent, which sees it at its next boundary (see `useAgent().send`).
+   * Off: the input does nothing while a run is going, as before.
+   */
+  steering?: boolean
+  /** Messages waiting for the agent, and the ones a stopped run left undelivered (default true). */
+  showQueued?: boolean
   /** Below this width (px) the toolbar chips show icons and numbers only (default 460). */
   compactWidth?: number
   /** Extra content in the toolbar, after the "/" button. */
@@ -252,6 +262,8 @@ export const AgentComposer = ({
   showAgents = true,
   showApprovalMode = true,
   showNotices = true,
+  steering = true,
+  showQueued = true,
   compactWidth = 460,
   toolbarExtra,
   toolbarEnd,
@@ -567,7 +579,19 @@ export const AgentComposer = ({
   // ── submit ──────────────────────────────────────────────────────────────────
   const submit = () => {
     const raw = text.trim()
-    if (busy || !ready) return
+    // While the agent works, text is said TO it; everything else waits for the next message.
+    const intent = steerIntent({ raw, busy, steering, hasAttachments: pending.length > 0 })
+    if (intent === 'steer') {
+      // If the run ended a moment ago `send` refuses: the text stays, nothing is lost.
+      if (agent.send(raw)) setText('')
+      return
+    }
+    if (intent === 'attachments') {
+      setAttachError(L.noAttachmentsWhileBusy)
+      return
+    }
+    if (intent === 'ignore') return
+    if (!ready) return
     const parsed = parseSlash(raw)
     if (parsed) {
       const cmd = allCommands.find((c) => c.name === parsed.name)
@@ -681,6 +705,35 @@ export const AgentComposer = ({
     ? (thinkingOptions.find((o) => o.id === thinking.value)?.label ?? thinking.value)
     : undefined
   const canSend = ready && (text.trim().length > 0 || pending.length > 0)
+  const canSteer = busy && steering && text.trim().length > 0
+  const queuedStrip =
+    showQueued && (agent.queued.length > 0 || agent.undelivered.length > 0) ? (
+      <div className="awr-queued">
+        {agent.queued.map((q) => (
+          <div key={q.id} className="awr-queued__item" role="status">
+            <ClockIcon size={13} className="awr-queued__icon" />
+            <span className="awr-queued__text" title={q.text}>
+              {q.text}
+            </span>
+            <span className="awr-queued__state">{L.queuedWaiting}</span>
+          </div>
+        ))}
+        {agent.undelivered.length > 0 && (
+          <div className="awr-queued__item awr-queued__item--undelivered" role="status">
+            <AlertIcon size={13} className="awr-queued__icon" />
+            <span className="awr-queued__text" title={agent.undelivered.join('\n\n')}>
+              {L.undelivered(agent.undelivered.length)}: {agent.undelivered.join(' · ')}
+            </span>
+            <button type="button" className="awr-linkbtn" onClick={agent.sendUndelivered}>
+              {L.sendUndelivered}
+            </button>
+            <button type="button" className="awr-linkbtn" onClick={agent.discardUndelivered}>
+              {L.discardUndelivered}
+            </button>
+          </div>
+        )}
+      </div>
+    ) : null
 
   return (
     <div
@@ -699,6 +752,7 @@ export const AgentComposer = ({
           {L.dropHint}
         </div>
       )}
+      {queuedStrip}
       {notices.length > 0 && (
         <div className="awr-notices">
           {notices.map((n) => (
@@ -781,7 +835,13 @@ export const AgentComposer = ({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
-          placeholder={stt.listening ? L.listening : (placeholder ?? L.placeholder)}
+          placeholder={
+            stt.listening
+              ? L.listening
+              : busy && steering
+                ? L.placeholderBusy
+                : (placeholder ?? L.placeholder)
+          }
           disabled={disabled}
           rows={2}
           aria-label={L.message}
@@ -957,6 +1017,11 @@ export const AgentComposer = ({
           </span>
         )}
 
+        {canSteer && (
+          <button type="button" className="awr-sendbtn" onClick={submit} aria-label={L.steer}>
+            <SendIcon size={16} />
+          </button>
+        )}
         {busy ? (
           <button
             type="button"

@@ -75,6 +75,10 @@ export interface AgentChatProps {
   showUsage?: boolean
   /** Thoughts, when the model thinks (default true). */
   showThoughts?: boolean
+  /** What you said while the agent worked, under the step it reached (default true). */
+  showNotes?: boolean
+  /** A stop button on each running subagent (default true). */
+  stoppableSubagents?: boolean
   /** Conversation total in the header (default true). */
   showTotalUsage?: boolean
   /** Status dot in the header (default true). */
@@ -171,6 +175,8 @@ const AgentChatInner = ({
   showToolCalls = true,
   showUsage = true,
   showThoughts = true,
+  showNotes = true,
+  stoppableSubagents = true,
   showTotalUsage = true,
   showStatus = true,
   showApprovalMode = true,
@@ -380,6 +386,8 @@ const AgentChatInner = ({
             showToolCalls={showToolCalls}
             showUsage={showUsage}
             showThoughts={showThoughts}
+            showNotes={showNotes}
+            onStopSubagent={stoppableSubagents ? agent.stopSubagent : undefined}
             activityOpen={activityOpen}
             liveExtra={liveExtra}
             renderContent={renderContent}
