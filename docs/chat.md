@@ -235,7 +235,7 @@ tokens inside an element with class `awr-theme`.
 | `useChatHistory` | saved chats over a `ChatHistoryStore` |
 | `useVirtualFiles` | a live listing of a `VirtualFileSystem` + upload / remove / read |
 | `useSpeechToText` | Web Speech API: `{ supported, listening, interim, start, stop, toggle }` |
-| `useMcpServers` | several MCP servers, merged tools |
+| `useMcpServers` | several MCP servers, merged tools — import from `@dudko.dev/agent-web-react/mcp` |
 | `agentStateReducer` | the pure event → UI reducer |
 | `parseSlash`, `filterCommands`, `attachmentKindOf`, `withAttachments`, `attachmentRefusal`, `noticesOf`, `formatElapsed`, `usageLine` | the composer's and transcript's pure logic |
 | `downscaleImage` | the image downscaler |

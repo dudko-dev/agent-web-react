@@ -10,11 +10,13 @@ import {
   createSubagentTool,
   useAgent,
   useCredentials,
-  useMcpServers,
   useLocalModel,
   type AgentChatProps,
   type AgentToolSet,
 } from '@dudko.dev/agent-web-react'
+// The MCP hooks live behind their own subpath: a host that never imports it never needs
+// `@modelcontextprotocol/sdk` in its build.
+import { useMcpServers } from '@dudko.dev/agent-web-react/mcp'
 import type { LanguageModel } from 'ai'
 import { ANALYST_PROMPT, engineTools } from './chess/analyst-tools'
 import { ChessPanel } from './chess/ChessPanel'

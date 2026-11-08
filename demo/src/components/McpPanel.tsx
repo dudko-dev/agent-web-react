@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { McpAuthMode, UseMcpServersReturn } from '@dudko.dev/agent-web-react'
+import type { McpAuthMode, UseMcpServersReturn } from '@dudko.dev/agent-web-react/mcp'
 
 export interface McpPanelProps {
   mcp: UseMcpServersReturn

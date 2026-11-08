@@ -18,7 +18,8 @@ app with a single hook and (optionally) a set of pre-styled components:
 - 🧩 **Building blocks** — `<AgentComposer>`, `<MessageList>`, `<StepList>`,
   `<ToolApprovalPrompt>`, `<ChatHistoryList>`, `<FilesPanel>`, `<ContextMeter>`,
   `<ModelLoadBar>`, `<UsageBadge>`, `<ApiKeyForm>`; hooks `useChatHistory`,
-  `useVirtualFiles`, `useSpeechToText`, `useMcpServers`.
+  `useVirtualFiles`, `useSpeechToText`; MCP hooks `useMcp` / `useMcpServers` live in
+  [`@dudko.dev/agent-web-react/mcp`](#mcp-hooks-live-in-their-own-subpath).
 - 🔑 **`useCredentials`** — store BYOK API keys **encrypted at rest**
   (WebCrypto + IndexedDB).
 - 🖥️ **`useWebLLMModel`** / **`useLocalModel`** — load an on-device model (WebLLM,
@@ -318,6 +319,30 @@ function CloudAgent() {
 The [`demo/`](demo/) app does exactly this — see
 [`demo/src/providers.ts`](demo/src/providers.ts).
 
+## MCP hooks live in their own subpath
+
+```tsx
+import { useMcp, useMcpServers } from '@dudko.dev/agent-web-react/mcp'
+```
+
+The MCP hooks are **not** exported from `@dudko.dev/agent-web-react`. They load the
+core's `@dudko.dev/agent-web/mcp`, which imports `@modelcontextprotocol/sdk` — an
+*optional* peer, so npm does not install it for you. A bundler cannot honour
+"optional": it resolves even a dynamic `import()` at build time, so a host that
+merely imported `useAgent` from the main entry used to fail webpack/CRA with
+`Module not found: @modelcontextprotocol/sdk/…` while never touching MCP. Behind a
+subpath the decision is yours:
+
+- **Don't use MCP** → import only from the main entry. Nothing in your build
+  mentions the SDK; install nothing extra.
+- **Use MCP** → import from `…/mcp` and `npm install @modelcontextprotocol/sdk`
+  next to the core (it is bundled into an async chunk, loaded when you connect).
+
+> **Migrating from ≤ 0.0.18.** `useMcp`, `useMcpServers` and their helpers
+> (`readCallbackParams`, `claimOAuthCallback`, `stripOAuthParams`,
+> `describeMcpResult`, `isUnauthorizedError`) and types (`McpStatus`,
+> `McpAuthMode`, `McpServerView`, …) moved: change the import path, nothing else.
+
 ## The `useMcp` hook — connect a remote MCP server
 
 Let the user name their own MCP server at runtime and hand its tools to the
@@ -326,6 +351,8 @@ client registration** — no client ID to configure, and the access token is
 refreshed for you when it expires mid-run.
 
 ```tsx
+import { useMcp } from '@dudko.dev/agent-web-react/mcp'
+
 const mcp = useMcp({ clientName: 'my-app' })
 
 await mcp.connect({ url, oauth: true })       // or { url, headers: { Authorization } }
@@ -350,9 +377,9 @@ covers that window.
 Two notes:
 
 - The connector lives in the core's optional `@dudko.dev/agent-web/mcp` subpath
-  and is loaded with a **dynamic import**, so apps that never call `connect`
-  don't pay for `@modelcontextprotocol/sdk`. Install it alongside the core when
-  you do use MCP.
+  and is loaded with a **dynamic import**, so the SDK stays out of your initial
+  bundle until `connect` runs. Install `@modelcontextprotocol/sdk` alongside the
+  core — importing these hooks is what puts it in your build.
 - `oauthSupported` is `false` on cores older than `@dudko.dev/agent-web@0.0.9`,
   which introduced `BrowserOAuthProvider`; header auth still works there. The
   peer floor is `>=0.0.20` — the first core with the virtual file system,
@@ -362,6 +389,8 @@ Two notes:
 ## Several MCP servers — `useMcpServers`
 
 ```tsx
+import { useMcpServers } from '@dudko.dev/agent-web-react/mcp'
+
 const mcp = useMcpServers({ clientName: 'my-app' }) // the list persists; reconnects on load
 await mcp.add({ name: 'docs', url, auth: 'oauth' }) // 'none' | 'bearer' (+ token) | 'oauth'
 mcp.servers  // [{ name, url, status, catalog, error, … }]
