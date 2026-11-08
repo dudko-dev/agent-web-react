@@ -18,6 +18,9 @@ export default defineConfig({
     dedupe: ['react', 'react-dom', '@dudko.dev/agent-web', 'ai', 'zod'],
     alias: [
       { find: '@dudko.dev/agent-web-react/styles.css', replacement: at('../dist/styles.css') },
+      // Before the bare name: a string alias also matches by prefix, so without this
+      // `…/mcp` would resolve to `../dist/index.js/mcp`.
+      { find: '@dudko.dev/agent-web-react/mcp', replacement: at('../dist/mcp.js') },
       { find: '@dudko.dev/agent-web-react', replacement: at('../dist/index.js') },
     ],
   },

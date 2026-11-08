@@ -6,7 +6,7 @@ import {
   isUnauthorizedError,
   readCallbackParams,
   stripOAuthParams,
-} from '../dist/index.js'
+} from '../dist/mcp.js'
 
 // The connect/OAuth machinery lives in the core and is covered there; what this
 // package owns is the mapping from a connect outcome to UI state, and the URL

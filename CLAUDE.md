@@ -41,6 +41,12 @@ The repo also contains a **Vite demo** (`demo/`) that is auto-deployed to
   `useLabels`); components take `labels` overrides.
 - `src/mcp-types.ts` — structural types for the core's optional `./mcp` subpath,
   which `use-mcp` loads with a dynamic import (never a static one).
+- `src/mcp.ts` — the **`./mcp` entry**: `useMcp`, `useMcpServers` and their helpers
+  and types. They are deliberately NOT in `src/index.ts`. A bundler resolves even a
+  dynamic `import('@dudko.dev/agent-web/mcp')` at build time, and the core's `mcp.js`
+  statically imports the optional `@modelcontextprotocol/sdk` — so any reference from
+  the main entry fails webpack/CRA builds of hosts that never use MCP.
+  `tests/entries.test.ts` enforces it; don't move MCP back "for convenience".
 - `src/context.tsx` — `AgentProvider` + `useAgentContext`.
 - `src/components/` — `AgentChat` (panel: history sidebar, transcript,
   composer, files panel; slots / render props / components / theme),

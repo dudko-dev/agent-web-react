@@ -15,7 +15,9 @@ const EXTERNAL = [
 ]
 
 export default defineConfig({
-  entry: { index: 'src/index.ts' },
+  // `mcp` is its own entry so that nothing in `index` can pull the core's MCP connector (and with
+  // it the optional MCP SDK) into a host's build — see src/mcp.ts.
+  entry: { index: 'src/index.ts', mcp: 'src/mcp.ts' },
   format: ['esm', 'cjs'],
   dts: true,
   sourcemap: true,
