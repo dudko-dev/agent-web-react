@@ -986,3 +986,7 @@ a {
   display: block;
   margin: 4px 0;
 }
+
+.agentset__notebook {
+  margin-top: 8px;
+}

@@ -6,6 +6,7 @@ import {
   ChatHistoryStore,
   IndexedDBStore,
   MemoryStore,
+  VfsSkillStore,
   createFileTools,
   createSubagentTool,
   useAgent,
@@ -164,6 +165,16 @@ export const App = () => {
   )
   // The agents can read the attachments and write files into the workspace.
   const fileTools = useMemo(() => createFileTools(workspace), [])
+  // The notebook: what an agent learns is a SKILL.md in the workspace (/skills/<tab>), one folder
+  // per tab, so it survives a reload and shows up in the Files panel like any file.
+  const notebooks = useMemo(
+    () => ({
+      notes: new VfsSkillStore(workspace, '/skills/notes'),
+      mcp: new VfsSkillStore(workspace, '/skills/mcp'),
+      chess: new VfsSkillStore(workspace, '/skills/chess'),
+    }),
+    [],
+  )
   // Each tab gets only its own skills (chess coaching has no place in an MCP
   // chat); custom skills apply everywhere.
   const skillsByTab = useMemo(
@@ -182,6 +193,7 @@ export const App = () => {
     sessionId: tab,
     ...settingsConfig,
     skills: skillsByTab[tab],
+    ...(settings.learning ? { learning: { store: notebooks[tab] } } : {}),
     // The consent mode is applied live by useAgent — no rebuild on a switch.
     toolApproval: { mode: settings.approvalMode },
     // Images, where the core can't tell from the model (built-in, Gemma 4).
@@ -468,6 +480,7 @@ export const App = () => {
             <AgentSettingsPanel
               settings={settings}
               view={view}
+              controller={{ notes: notesAgent, mcp: mcpAgent, chess: chessAgent }[view]}
               modelWindow={modelWindow}
               update={update}
               onReset={resetSettings}

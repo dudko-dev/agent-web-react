@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import {
   ApprovalModeSwitch,
+  LearnedSkills,
   loadSkillFromUrl,
   parseSkillMarkdown,
+  type UseAgentReturn,
 } from '@dudko.dev/agent-web-react'
 import {
   allSkills,
@@ -18,6 +20,8 @@ export interface AgentSettingsPanelProps {
   settings: DemoSettings
   /** The open tab: its skills are listed, and the notes speak about its tools. */
   view: View
+  /** The open tab's agent: its notebook is listed under "Learning". */
+  controller?: UseAgentReturn
   /** The model's own window, when known ("auto" uses it). */
   modelWindow?: number
   update: (patch: Partial<DemoSettings>) => void
@@ -39,6 +43,7 @@ const k = (n: number) =>
 export const AgentSettingsPanel = ({
   settings,
   view,
+  controller,
   modelWindow,
   update,
   onReset,
@@ -273,6 +278,49 @@ export const AgentSettingsPanel = ({
             </select>
           </label>
         </div>
+      </div>
+
+      <div className="agentset__group">
+        <span className="settings__label">Learning and web access</span>
+        <div className="agentset__checks">
+          <label title="The agent keeps a notebook: when it solves a problem it writes the lesson down as a skill of its own, and the planner sees it from then on. You can read, edit and delete the files in the Files panel (/skills).">
+            <input
+              type="checkbox"
+              checked={settings.learning}
+              onChange={(e) => update({ learning: e.target.checked })}
+            />{' '}
+            Let the agent learn (save lessons as skills)
+          </label>
+          <label title="Off by default: with it off the agent has no way to make a request of its own. On, it gets one tool, web_fetch, limited to the hosts below.">
+            <input
+              type="checkbox"
+              checked={settings.egress}
+              onChange={(e) => update({ egress: e.target.checked })}
+            />{' '}
+            Let it read the web (web_fetch)
+          </label>
+        </div>
+        {settings.egress && (
+          <label className="settings__field">
+            <span className="settings__label">Allowed hosts</span>
+            <input
+              className="settings__select"
+              type="text"
+              value={settings.egressAllow}
+              placeholder="en.wikipedia.org, *.github.com"
+              onChange={(e) => update({ egressAllow: e.target.value })}
+            />
+            <span className="settings__note">
+              Comma-separated; <code>*.host</code> covers subdomains. Empty = any public https host
+              — risky in a browser, which cannot pin DNS; keep a list. Only sites that allow
+              cross-origin reads (CORS) answer at all; for the rest hand <code>egress.fetch</code> a
+              gateway.
+            </span>
+          </label>
+        )}
+        {settings.learning && (
+          <LearnedSkills controller={controller} showSources className="agentset__notebook" />
+        )}
       </div>
 
       <div className="agentset__group">
