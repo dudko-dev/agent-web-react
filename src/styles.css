@@ -1406,3 +1406,107 @@
     max-width: 70vw;
   }
 }
+
+/* ── notebook: the agent's own lessons, and what it fetched ─────────────────── */
+.awr-notebook {
+  font-size: 13px;
+}
+.awr-notebook__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.awr-notebook__count {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--awr-subtle);
+  color: var(--awr-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.awr-notebook__empty {
+  margin: 0;
+  color: var(--awr-muted);
+}
+.awr-notebook__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.awr-lesson {
+  padding: 8px 10px;
+  border: 1px solid var(--awr-border);
+  border-radius: 8px;
+  background: var(--awr-subtle);
+}
+.awr-lesson__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.awr-lesson__name {
+  font-family: var(--awr-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+.awr-lesson__rev {
+  color: var(--awr-muted);
+  font-size: 11px;
+}
+.awr-lesson__forget {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--awr-muted);
+  cursor: pointer;
+}
+.awr-lesson__forget:hover {
+  color: var(--awr-danger);
+}
+.awr-lesson__when {
+  margin: 4px 0 0;
+}
+.awr-lesson__from {
+  margin: 4px 0 0;
+  color: var(--awr-muted);
+  font-size: 11px;
+  word-break: break-all;
+}
+.awr-learned {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  color: var(--awr-muted);
+  font-size: 12px;
+}
+.awr-fetches {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.awr-fetch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: var(--awr-muted);
+}
+.awr-fetch code {
+  font-family: var(--awr-mono);
+  word-break: break-all;
+}
+.awr-fetch--refused {
+  color: var(--awr-warn);
+}

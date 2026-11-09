@@ -54,6 +54,10 @@ export interface ChatMessage {
   durationMs?: number
   /** Assistant turn: skills the run used. */
   skills?: string[]
+  /** Assistant turn: lessons the agent wrote down during the run (names). */
+  learned?: string[]
+  /** Assistant turn: what the model fetched from the web during the run. */
+  fetches?: FetchView[]
   /** Assistant turn ended with an error. */
   error?: boolean
 }
@@ -73,6 +77,31 @@ export interface ToolCallView {
   inputTokens?: number
   /** ≈ tokens of the result fed back to the model (chars / 4). */
   outputTokens?: number
+}
+
+/**
+ * A lesson in the agent's notebook (`config.learning`): a skill the agent wrote down itself.
+ * `revision` goes up each time it rewrites the lesson.
+ */
+export interface LessonView {
+  name: string
+  /** WHEN the lesson applies - the line the planner sees. */
+  description: string
+  revision: number
+  /** Size of the instructions, in characters. */
+  chars: number
+  /** What it consulted: the sources it named, then the pages `web_fetch` read in that run. */
+  sources: string[]
+}
+
+/** One request the model made through `web_fetch` (an `egress.request` event). */
+export interface FetchView {
+  /** Origin and path only - the core never reports the query string. */
+  url: string
+  allowed: boolean
+  status?: number
+  /** Why it was refused. */
+  reason?: string
 }
 
 /** A tool call waiting for (or decided by) the user's consent. */
@@ -204,6 +233,16 @@ export interface AgentUiState {
   undelivered: string[]
   /** Skills activated in this run. */
   skills: string[]
+  /**
+   * The agent's notebook: the lessons it wrote down (`config.learning`). It belongs to the
+   * agent, not to a conversation - it survives `reset` and a chat switch, and the hook
+   * re-reads it whenever the agent is rebuilt.
+   */
+  learned: LessonView[]
+  /** Names of the lessons written in this run. */
+  learnedNow: string[]
+  /** What the model fetched from the web in this run (`config.egress`). */
+  fetches: FetchView[]
   /** Tools activated by find_tools in this run. */
   discoveredTools: string[]
   /** Compactions in this run. */

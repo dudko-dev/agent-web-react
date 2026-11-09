@@ -16,6 +16,8 @@ export interface GeminiCall {
   functionResponses: { name: string; response: unknown }[]
   /** Inline files sent (images, PDFs). */
   inlineData: { mimeType: string; bytes: number }[]
+  /** Names of the functions offered to the model on this call. */
+  tools: string[]
   /** generationConfig.thinkingConfig.thinkingLevel, when the call asked for thinking. */
   thinkingLevel?: string
   streaming: boolean
@@ -41,6 +43,7 @@ type Body = {
   systemInstruction?: { parts?: Part[] }
   contents?: { role: string; parts?: Part[] }[]
   generationConfig?: { thinkingConfig?: { thinkingLevel?: string } }
+  tools?: { functionDeclarations?: { name: string }[] }[]
 }
 
 const stageOf = (system: string): GeminiCall['stage'] => {
@@ -84,6 +87,7 @@ export const mockGemini = async (
       inlineData: parts
         .filter((p) => p.inlineData)
         .map((p) => ({ mimeType: p.inlineData!.mimeType, bytes: p.inlineData!.data.length })),
+      tools: (body.tools ?? []).flatMap((t) => (t.functionDeclarations ?? []).map((d) => d.name)),
       thinkingLevel: body.generationConfig?.thinkingConfig?.thinkingLevel,
       streaming: req.url().includes(':streamGenerateContent'),
     }

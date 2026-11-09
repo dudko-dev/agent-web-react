@@ -13,7 +13,9 @@ import {
   defaultLabels,
   filterCommands,
   formatElapsed,
+  LearnedSkills,
   mergeLabels,
+  MessageList,
   newChatId,
   noticesOf,
   parseSlash,
@@ -26,6 +28,7 @@ import {
   type AgentUiState,
   type ChatMessage,
   type ComposerAttachment,
+  type LessonView,
   type SlashCommand,
   type StepView,
   type SubagentView,
@@ -364,4 +367,98 @@ test('StepList: a note sits under the step it reached; one without a step goes a
   // Hosts can hide them.
   const hidden = html(createElement(StepList, { steps: [st('a', 1)], notes, showNotes: false }))
   assert.doesNotMatch(hidden, /during A|before the answer/)
+})
+
+// ── the notebook and what was fetched ────────────────────────────────────────
+
+const lesson = (over: Partial<LessonView> = {}): LessonView => ({
+  name: 'image-format-jpg',
+  description: 'When convert rejects the format "jpeg"',
+  revision: 1,
+  chars: 80,
+  sources: [],
+  ...over,
+})
+
+test('LearnedSkills: each lesson with when it applies, its revision and where it came from', () => {
+  const out = html(
+    createElement(LearnedSkills, {
+      lessons: [
+        lesson({ revision: 3, sources: ['the docs', 'https://docs.example.com/formats'] }),
+        lesson({ name: 'second' }),
+      ],
+      onForget: () => {},
+    }),
+  )
+  assert.match(out, /Notebook/)
+  assert.match(out, /image-format-jpg/)
+  assert.match(out, /When convert rejects the format &quot;jpeg&quot;/)
+  assert.match(out, /revision 3/)
+  assert.doesNotMatch(out, /revision 1/, 'a first revision says nothing')
+  assert.match(out, /from the docs, https:\/\/docs\.example\.com\/formats/)
+  assert.equal((out.match(/awr-lesson__forget/g) ?? []).length, 2, 'a forget button per lesson')
+})
+
+test('LearnedSkills: read-only without a forget handler; sources, title and the empty text can go or change', () => {
+  const none = html(createElement(LearnedSkills, { lessons: [], onForget: false }))
+  assert.match(none, /The agent has not written any lessons down yet\./)
+  const readOnly = html(
+    createElement(LearnedSkills, {
+      lessons: [lesson({ sources: ['x'] })],
+      onForget: false,
+      showSources: false,
+      hideTitle: true,
+    }),
+  )
+  assert.doesNotMatch(readOnly, /awr-lesson__forget|awr-lesson__from|Notebook/)
+  const relabelled = html(
+    createElement(LearnedSkills, {
+      lessons: [lesson()],
+      onForget: () => {},
+      labels: { notebookTitle: 'Memory', notebookForget: 'Drop' },
+    }),
+  )
+  assert.match(relabelled, /Memory/)
+  assert.match(relabelled, /aria-label="Drop: image-format-jpg"/)
+})
+
+const assistant = (over: Partial<ChatMessage> = {}): ChatMessage => ({
+  id: 'm1',
+  role: 'assistant',
+  content: 'Done.',
+  pending: false,
+  steps: [
+    {
+      id: 's1',
+      index: 1,
+      total: 1,
+      step: { id: 's1', description: 'Look it up' },
+      text: '',
+      reasoning: '',
+      toolCalls: [],
+      status: 'done',
+      blocked: false,
+    },
+  ],
+  ...over,
+})
+
+test('MessageList: the turn says what the agent learned and what it fetched - and either can be hidden', () => {
+  const m = assistant({
+    learned: ['image-format-jpg'],
+    fetches: [
+      { url: 'https://docs.example.com/formats', allowed: true, status: 200 },
+      { url: 'https://169.254.169.254/x', allowed: false, reason: 'denied-address' },
+    ],
+  })
+  const out = html(createElement(MessageList, { messages: [m], activityOpen: true }))
+  assert.match(out, /1 step · 0 tool calls · learned: image-format-jpg · 2 web requests/)
+  assert.match(out, /awr-fetch[^-][\s\S]*docs\.example\.com\/formats[\s\S]*200/)
+  assert.match(out, /awr-fetch--refused[\s\S]*169\.254\.169\.254[\s\S]*refused: denied-address/)
+  assert.match(out, /<p class="awr-learned">[\s\S]*learned: image-format-jpg/)
+
+  const hidden = html(
+    createElement(MessageList, { messages: [m], activityOpen: true, showLearned: false }),
+  )
+  assert.doesNotMatch(hidden, /learned:|web request|awr-fetch/)
 })

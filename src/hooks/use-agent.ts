@@ -15,7 +15,7 @@ import {
   type ToolApprovalMode,
   type ToolApprovalRequest,
 } from '@dudko.dev/agent-web'
-import { agentStateReducer, createInitialAgentState } from '../state.js'
+import { agentStateReducer, createInitialAgentState, lessonsOf } from '../state.js'
 import type { AgentUiState, ApprovalView, ChatAttachment, ChatMessage } from '../types.js'
 import { errMessage } from '../util.js'
 
@@ -84,6 +84,11 @@ export interface UseAgentReturn extends AgentUiState {
   send: (text: string) => boolean
   /** Stop ONE running subagent (`SubagentView.id`); the run and its siblings go on. */
   stopSubagent: (id: string) => boolean
+  /**
+   * Delete one of the agent's own lessons (`learned`), e.g. one gone stale. Resolves false when
+   * there is no such lesson (or no agent yet). Needs `config.learning`.
+   */
+  forgetSkill: (name: string) => Promise<boolean>
   /** Send the `undelivered` messages (a stopped run's leftovers) as a new message. */
   sendUndelivered: () => void
   /** Drop the `undelivered` messages. */
@@ -230,6 +235,8 @@ export const useAgent = (
         if (cancelled) return
         agent.setToolApprovalMode(modeRef.current)
         agentRef.current = agent
+        // The notebook belongs to the agent just built: what its store brought back (or nothing).
+        dispatch({ type: 'notebook', lessons: lessonsOf(agent.listLearnedSkills()) })
         setBuildStatus({ status: 'ready' })
       })
       .catch((err) => {
@@ -362,6 +369,14 @@ export const useAgent = (
     [],
   )
 
+  const forgetSkill = useCallback(async (name: string): Promise<boolean> => {
+    const agent = agentRef.current
+    if (!agent) return false
+    return agent.forgetSkill(name, (event) =>
+      dispatch({ type: 'event', event, maxEvents: optionsRef.current.maxEvents, at: Date.now() }),
+    )
+  }, [])
+
   const approve = useCallback((id: string, opts?: ApproveOptions) => {
     const resolve = resolversRef.current.get(id)
     if (!resolve) return
@@ -402,6 +417,7 @@ export const useAgent = (
     stop,
     send,
     stopSubagent,
+    forgetSkill,
     sendUndelivered,
     discardUndelivered,
     reset,

@@ -1,9 +1,10 @@
-import type { AgentEvent, IUsage } from '@dudko.dev/agent-web'
+import type { AgentEvent, IUsage, Skill } from '@dudko.dev/agent-web'
 import type {
   AgentUiState,
   ApprovalView,
   ChatAttachment,
   ChatMessage,
+  LessonView,
   StepView,
   SubagentView,
   ToolCallView,
@@ -33,6 +34,11 @@ export type AgentAction =
       at?: number
       attachments?: ChatAttachment[]
     }
+  /**
+   * The agent's notebook as it is now (the hook sends it when the agent is built: lessons a
+   * persistent store brought back). Later `skill.learned` / `skill.forgotten` events keep it current.
+   */
+  | { type: 'notebook'; lessons: LessonView[] }
   /** Replace the transcript with a saved conversation (chat history). */
   | { type: 'load'; messages: ChatMessage[]; totalUsage?: IUsage }
   /**
@@ -77,6 +83,21 @@ const addUsage = (a: IUsage, b: IUsage): IUsage => ({
   cacheWriteTokens: (a.cacheWriteTokens ?? 0) + (b.cacheWriteTokens ?? 0),
 })
 
+/**
+ * The notebook view of the agent's own skills (`agent.listLearnedSkills()`): what the core stored
+ * about each lesson, in the shape the UI keeps current from `skill.learned` events.
+ */
+export const lessonsOf = (skills: Skill[]): LessonView[] =>
+  skills
+    .filter((s) => s.origin?.kind === 'learned')
+    .map((s) => ({
+      name: s.name,
+      description: s.description,
+      revision: s.origin?.revision ?? 1,
+      chars: s.content.length,
+      sources: [...(s.origin?.sources ?? []), ...(s.origin?.fetched ?? [])],
+    }))
+
 /** A fresh, empty view. */
 export const createInitialAgentState = (): AgentUiState => ({
   status: 'idle',
@@ -95,6 +116,9 @@ export const createInitialAgentState = (): AgentUiState => ({
   notes: [],
   undelivered: [],
   skills: [],
+  learned: [],
+  learnedNow: [],
+  fetches: [],
   discoveredTools: [],
   compactions: [],
   budget: undefined,
@@ -115,6 +139,7 @@ const resetRun = (state: AgentUiState): AgentUiState => ({
   messages: state.messages,
   totalUsage: state.totalUsage,
   seq: state.seq,
+  learned: state.learned,
 })
 
 /** Apply `fn` to the step whose id matches, leaving the rest untouched. */
@@ -518,6 +543,45 @@ const applyEvent = (state: AgentUiState, event: AgentEvent, ctx: EventContext): 
         ? state
         : { ...state, skills: [...state.skills, event.name] }
 
+    case 'skill.learned': {
+      const before = state.learned.find((l) => l.name === event.name)
+      const lesson: LessonView = {
+        name: event.name,
+        description: event.description,
+        // A rewrite of a lesson we know goes up one; a lesson we never saw (an event for a store
+        // loaded before this view existed) starts at 2 when the core says it is an update.
+        revision: event.update ? (before?.revision ?? 1) + 1 : 1,
+        chars: event.chars,
+        sources: event.sources,
+      }
+      return {
+        ...state,
+        learned: before
+          ? state.learned.map((l) => (l.name === event.name ? lesson : l))
+          : [...state.learned, lesson],
+        learnedNow: state.learnedNow.includes(event.name)
+          ? state.learnedNow
+          : [...state.learnedNow, event.name],
+      }
+    }
+
+    case 'skill.forgotten':
+      return { ...state, learned: state.learned.filter((l) => l.name !== event.name) }
+
+    case 'egress.request':
+      return {
+        ...state,
+        fetches: [
+          ...state.fetches,
+          {
+            url: event.url,
+            allowed: event.allowed,
+            ...(event.status !== undefined ? { status: event.status } : {}),
+            ...(event.reason ? { reason: event.reason } : {}),
+          },
+        ],
+      }
+
     case 'tools.discovered':
       return {
         ...state,
@@ -593,6 +657,9 @@ const syncRunMessage = (state: AgentUiState): AgentUiState => {
   if (m.usage !== state.usage) patch.usage = state.usage
   if ((m.reasoning ?? '') !== state.finalReasoning) patch.reasoning = state.finalReasoning
   if (m.skills !== state.skills) patch.skills = state.skills
+  if (state.learnedNow.length > 0 && m.learned !== state.learnedNow)
+    patch.learned = state.learnedNow
+  if (state.fetches.length > 0 && m.fetches !== state.fetches) patch.fetches = state.fetches
   if (
     (m.approvals?.length ?? 0) !== decided.length ||
     decided.some((a, k) => m.approvals?.[k] !== a)
@@ -611,7 +678,14 @@ export const agentStateReducer = (state: AgentUiState, action: AgentAction): Age
       // A full "new conversation" clear — unlike run.start, this also drops the
       // transcript. Keep status (the agent is still built) and the seq counter
       // (so ids stay unique across resets).
-      return { ...createInitialAgentState(), status: state.status, seq: state.seq }
+      return {
+        ...createInitialAgentState(),
+        status: state.status,
+        seq: state.seq,
+        learned: state.learned,
+      }
+    case 'notebook':
+      return { ...state, learned: action.lessons }
     case 'status':
       return {
         ...state,
@@ -641,6 +715,7 @@ export const agentStateReducer = (state: AgentUiState, action: AgentAction): Age
         messages: action.messages.map((m) => (m.pending ? { ...m, pending: false } : m)),
         totalUsage: action.totalUsage ?? emptyUsage(),
         seq: maxSeq,
+        learned: state.learned,
       }
     }
     default:

@@ -4,6 +4,7 @@ import type { AgentEvent } from '@dudko.dev/agent-web'
 import {
   agentStateReducer,
   createInitialAgentState,
+  lessonsOf,
   type AgentAction,
   type AgentUiState,
 } from '../dist/index.js'
@@ -431,4 +432,148 @@ test('reset and load clear the steering state too', () => {
   assert.deepEqual([reset.queued, reset.notes, reset.undelivered], [[], [], []])
   const loaded = agentStateReducer(s, { type: 'load', messages: [] })
   assert.deepEqual([loaded.queued, loaded.notes, loaded.undelivered], [[], [], []])
+})
+
+// ── the agent's notebook and the web ─────────────────────────────────────────
+
+const learnedEvent = (
+  name: string,
+  over: { update?: boolean; sources?: string[] } = {},
+): AgentEvent => ({
+  type: 'skill.learned',
+  name,
+  description: `when ${name} applies`,
+  update: over.update ?? false,
+  chars: 120,
+  sources: over.sources ?? [],
+})
+
+test('skill.learned adds a lesson to the notebook and to the turn that wrote it', () => {
+  let s = startedRun()
+  s = event(s, learnedEvent('image-format-jpg', { sources: ['https://docs.example.com/formats'] }))
+  assert.deepEqual(s.learned, [
+    {
+      name: 'image-format-jpg',
+      description: 'when image-format-jpg applies',
+      revision: 1,
+      chars: 120,
+      sources: ['https://docs.example.com/formats'],
+    },
+  ])
+  assert.deepEqual(s.learnedNow, ['image-format-jpg'])
+  const turn = s.messages.at(-1)
+  assert.deepEqual(turn?.learned, ['image-format-jpg'], 'the assistant turn keeps it')
+})
+
+test('a rewrite of a lesson bumps its revision instead of adding a second entry', () => {
+  let s = startedRun()
+  s = event(s, learnedEvent('a'))
+  s = event(s, learnedEvent('b'))
+  s = event(s, learnedEvent('a', { update: true }))
+  s = event(s, learnedEvent('a', { update: true }))
+  assert.deepEqual(
+    s.learned.map((l) => [l.name, l.revision]),
+    [
+      ['a', 3],
+      ['b', 1],
+    ],
+  )
+  assert.deepEqual(s.learnedNow, ['a', 'b'], 'each name once per run')
+})
+
+test('skill.forgotten removes the lesson from the notebook, and only that one', () => {
+  let s = startedRun()
+  s = event(s, learnedEvent('a'))
+  s = event(s, learnedEvent('b'))
+  s = event(s, { type: 'skill.forgotten', name: 'a' })
+  assert.deepEqual(
+    s.learned.map((l) => l.name),
+    ['b'],
+  )
+  assert.equal(event(s, { type: 'skill.forgotten', name: 'nope' }).learned.length, 1)
+})
+
+test('the notebook belongs to the agent: it outlives the next run, a reset and a chat switch', () => {
+  let s = startedRun()
+  s = event(s, learnedEvent('a'))
+  // Next run: the per-run list starts empty, the notebook stays.
+  s = event(s, { type: 'run.start', goal: 'again' })
+  assert.deepEqual(s.learnedNow, [])
+  assert.equal(s.learned.length, 1)
+  assert.equal(s.messages.at(-1)?.learned, undefined, 'a later turn did not learn it')
+  // New conversation / another saved chat: the lessons are the agent's, not the conversation's.
+  assert.equal(agentStateReducer(s, { type: 'reset' }).learned.length, 1)
+  assert.equal(agentStateReducer(s, { type: 'load', messages: [] }).learned.length, 1)
+})
+
+test('notebook: the hook replaces it with what the freshly built agent holds', () => {
+  let s = startedRun()
+  s = event(s, learnedEvent('old'))
+  s = agentStateReducer(s, {
+    type: 'notebook',
+    lessons: [{ name: 'stored', description: 'd', revision: 4, chars: 9, sources: [] }],
+  })
+  assert.deepEqual(
+    s.learned.map((l) => [l.name, l.revision]),
+    [['stored', 4]],
+  )
+  // ...and a rewrite of a stored lesson continues its count.
+  s = event(s, learnedEvent('stored', { update: true }))
+  assert.equal(s.learned[0].revision, 5)
+})
+
+test("lessonsOf: the agent's own skills only, with where each came from", () => {
+  const lessons = lessonsOf([
+    { name: 'host', description: 'h', content: 'configured by the host' },
+    {
+      name: 'mine',
+      description: 'm',
+      content: 'twelve chars',
+      origin: {
+        kind: 'learned',
+        at: 1,
+        revision: 3,
+        sources: ['the docs'],
+        fetched: ['https://docs.example.com/x'],
+      },
+    },
+  ])
+  assert.deepEqual(lessons, [
+    {
+      name: 'mine',
+      description: 'm',
+      revision: 3,
+      chars: 12,
+      sources: ['the docs', 'https://docs.example.com/x'],
+    },
+  ])
+})
+
+test('egress.request: what the model fetched, and what was refused, goes on the turn', () => {
+  let s = startedRun()
+  s = event(s, {
+    type: 'egress.request',
+    url: 'https://docs.example.com/guide',
+    allowed: true,
+    status: 200,
+  })
+  s = event(s, {
+    type: 'egress.request',
+    url: 'https://169.254.169.254/latest',
+    allowed: false,
+    reason: 'denied-address: not a public address',
+  })
+  assert.deepEqual(s.fetches, [
+    { url: 'https://docs.example.com/guide', allowed: true, status: 200 },
+    {
+      url: 'https://169.254.169.254/latest',
+      allowed: false,
+      reason: 'denied-address: not a public address',
+    },
+  ])
+  assert.equal(s.messages.at(-1)?.fetches?.length, 2)
+  // A new run starts a new list; the old turn keeps its own.
+  const next = event(s, { type: 'run.start', goal: 'again' })
+  assert.deepEqual(next.fetches, [])
+  assert.equal(next.messages.find((m) => m.fetches)?.fetches?.length, 2)
 })

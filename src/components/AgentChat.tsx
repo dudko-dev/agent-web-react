@@ -77,6 +77,8 @@ export interface AgentChatProps {
   showThoughts?: boolean
   /** What you said while the agent worked, under the step it reached (default true). */
   showNotes?: boolean
+  /** The lessons the agent wrote down during an answer, and the pages it fetched (default true). */
+  showLearned?: boolean
   /** A stop button on each running subagent (default true). */
   stoppableSubagents?: boolean
   /** Conversation total in the header (default true). */
@@ -176,6 +178,7 @@ const AgentChatInner = ({
   showUsage = true,
   showThoughts = true,
   showNotes = true,
+  showLearned = true,
   stoppableSubagents = true,
   showTotalUsage = true,
   showStatus = true,
@@ -387,6 +390,7 @@ const AgentChatInner = ({
             showUsage={showUsage}
             showThoughts={showThoughts}
             showNotes={showNotes}
+            showLearned={showLearned}
             onStopSubagent={stoppableSubagents ? agent.stopSubagent : undefined}
             activityOpen={activityOpen}
             liveExtra={liveExtra}

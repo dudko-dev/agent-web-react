@@ -3,7 +3,7 @@ import type { IUsage } from '@dudko.dev/agent-web'
 import { useLabels, type AgentLabels, type AgentLabelsOverride } from '../labels.js'
 import type { ChatAttachment, ChatMessage } from '../types.js'
 import { formatDuration, formatTokens } from './format.js'
-import { BrainIcon, FileIcon, SpinnerIcon } from './icons.js'
+import { BookIcon, BrainIcon, FileIcon, GlobeIcon, SpinnerIcon } from './icons.js'
 import { StepList, type RenderToolCall } from './StepList.js'
 
 export interface MessageListProps {
@@ -20,6 +20,8 @@ export interface MessageListProps {
   showThoughts?: boolean
   /** What the user said while the agent worked, under the step it reached (default true). */
   showNotes?: boolean
+  /** The lessons the agent wrote down during the answer, and the pages it fetched (default true). */
+  showLearned?: boolean
   /** Give a running subagent a stop button (`useAgent().stopSubagent`). */
   onStopSubagent?: (id: string) => void
   /** Open the activity of finished answers too (default: only while it runs). */
@@ -68,12 +70,19 @@ export const AttachmentView = ({ attachment: a }: { attachment: ChatAttachment }
 const toolCallCount = (m: ChatMessage): number =>
   (m.steps ?? []).reduce((n, s) => n + s.toolCalls.length, 0)
 
-const activitySummary = (m: ChatMessage, showToolCalls: boolean, L: AgentLabels): string => {
+const activitySummary = (
+  m: ChatMessage,
+  showToolCalls: boolean,
+  showLearned: boolean,
+  L: AgentLabels,
+): string => {
   const steps = m.steps ?? []
   const parts = [L.steps(steps.length)]
   if (showToolCalls) parts.push(L.toolCalls(toolCallCount(m)))
   if (m.subagents?.length) parts.push(L.subagents(m.subagents.length))
   if (m.skills?.length) parts.push(L.skillsUsed(m.skills.join(', ')))
+  if (showLearned && m.learned?.length) parts.push(L.learnedNow(m.learned.join(', ')))
+  if (showLearned && m.fetches?.length) parts.push(L.fetches(m.fetches.length))
   return parts.join(' · ')
 }
 
@@ -92,6 +101,7 @@ export const MessageList = ({
   showUsage = true,
   showThoughts = true,
   showNotes = true,
+  showLearned = true,
   onStopSubagent,
   activityOpen = false,
   liveExtra,
@@ -123,7 +133,7 @@ export const MessageList = ({
               {m.role === 'assistant' && hasActivity && (
                 <details className="awr-activity" open={m.pending || activityOpen}>
                   <summary className="awr-activity__summary">
-                    {activitySummary(m, showToolCalls, L)}
+                    {activitySummary(m, showToolCalls, showLearned, L)}
                   </summary>
                   {m.pending && liveExtra}
                   <StepList
@@ -139,6 +149,26 @@ export const MessageList = ({
                     renderToolCall={renderToolCall}
                     labels={labels}
                   />
+                  {showLearned && m.fetches?.length ? (
+                    <ul className="awr-fetches">
+                      {m.fetches.map((f, i) => (
+                        <li
+                          key={i}
+                          className={`awr-fetch${f.allowed ? '' : ' awr-fetch--refused'}`}
+                        >
+                          <GlobeIcon size={12} /> <code>{f.url}</code>{' '}
+                          <span className="awr-fetch__result">
+                            {f.allowed ? (f.status ?? 'ok') : L.fetchRefused(f.reason ?? '')}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {showLearned && m.learned?.length ? (
+                    <p className="awr-learned">
+                      <BookIcon size={12} /> {L.learnedNow(m.learned.join(', '))}
+                    </p>
+                  ) : null}
                   {showThoughts && m.reasoning?.trim() && (
                     <details className="awr-thought">
                       <summary>

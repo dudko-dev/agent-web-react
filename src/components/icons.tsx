@@ -144,6 +144,20 @@ export const HistoryIcon = ({ size, className }: IconProps) => (
   </svg>
 )
 
+export const BookIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z" />
+    <path d="M4 19V5M9 7h6" />
+  </svg>
+)
+
+export const GlobeIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" />
+  </svg>
+)
+
 export const DownloadIcon = ({ size, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M12 3v12m-5-5 5 5 5-5M5 21h14" />

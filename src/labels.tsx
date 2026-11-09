@@ -27,12 +27,26 @@ export interface AgentLabels {
   toolCalls: (n: number) => string
   subagents: (n: number) => string
   skillsUsed: (names: string) => string
+  /** "learned: a, b" - lessons the agent wrote down in this run. */
+  learnedNow: (names: string) => string
+  /** "2 web requests" - what the model fetched in this run. */
+  fetches: (n: number) => string
+  /** Why a web request was refused. */
+  fetchRefused: (reason: string) => string
   answerThoughts: string
   stepThoughts: string
   usageTitle: string
   attachments: string
   planned: string
   replanned: (mode: string, reason: string) => string
+
+  // ── notebook (the agent's own lessons) ─────────────────────────────────────
+  notebookTitle: string
+  notebookEmpty: string
+  notebookForget: string
+  notebookRevision: (n: number) => string
+  /** Before the sources a lesson came from. */
+  notebookFrom: string
 
   // ── composer ───────────────────────────────────────────────────────────────
   placeholder: string
@@ -156,12 +170,21 @@ export const defaultLabels: AgentLabels = {
   toolCalls: (n) => plural(n, 'tool call', 'tool calls'),
   subagents: (n) => plural(n, 'subagent', 'subagents'),
   skillsUsed: (names) => `skills: ${names}`,
+  learnedNow: (names) => `learned: ${names}`,
+  fetches: (n) => plural(n, 'web request', 'web requests'),
+  fetchRefused: (reason) => `refused: ${reason}`,
   answerThoughts: 'Thinking about the answer',
   stepThoughts: 'Thoughts',
   usageTitle: 'Tokens this answer spent, by kind',
   attachments: 'Attachments',
   planned: 'Plan',
   replanned: (mode, reason) => `Replanned (${mode}): ${reason}`,
+
+  notebookTitle: 'Notebook',
+  notebookEmpty: 'The agent has not written any lessons down yet.',
+  notebookForget: 'Forget',
+  notebookRevision: (n) => `revision ${n}`,
+  notebookFrom: 'from',
 
   placeholder: 'Ask the agent to do something…  ( / for commands, Ctrl+V to paste an image )',
   listening: 'Listening…',
