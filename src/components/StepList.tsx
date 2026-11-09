@@ -1,15 +1,17 @@
 import { Fragment } from 'react'
 import type { ReactNode } from 'react'
 import { useLabels, type AgentLabels, type AgentLabelsOverride } from '../labels.js'
-import type { ApprovalView, StepView, SubagentView, ToolCallView } from '../types.js'
+import type { ApprovalView, StepView, SubagentView, ToolCallView, UserNoteView } from '../types.js'
 import { formatDuration, formatTokens, imagesInOutput, previewValue } from './format.js'
 import {
   AlertIcon,
   BotIcon,
   BrainIcon,
   CheckIcon,
+  SendIcon,
   ShieldIcon,
   SpinnerIcon,
+  StopIcon,
   ToolIcon,
 } from './icons.js'
 
@@ -65,12 +67,18 @@ export const ToolCallRow = ({ call, showUsage = true, labels }: ToolCallRowProps
   )
 }
 
-/** A subagent delegation: name, task, live activity, and its answer when done. */
+/**
+ * A subagent delegation: name, task, live activity, and its answer when done. With
+ * `onStop`, a running one gets a stop button (the run and its siblings go on).
+ */
 export const SubagentRow = ({
   sub,
+  onStop,
   labels,
 }: {
   sub: SubagentView
+  /** Stop this subagent (`useAgent().stopSubagent`); the button shows while it runs. */
+  onStop?: (id: string) => void
   labels?: AgentLabelsOverride
 }) => {
   const L = useLabels(labels)
@@ -79,18 +87,50 @@ export const SubagentRow = ({
       <div className="awr-subagent__head">
         <BotIcon size={13} className="awr-subagent__icon" />
         <span className="awr-subagent__name">{sub.name}</span>
+        {sub.profile && <span className="awr-subagent__profile">{sub.profile}</span>}
         <span className="awr-subagent__task" title={sub.task}>
           {previewValue(sub.task, 90)}
         </span>
         {sub.status === 'running' && <SpinnerIcon size={12} className="awr-tool__spin" />}
+        {sub.status === 'running' && onStop && (
+          <button
+            type="button"
+            className="awr-iconbtn awr-subagent__stop"
+            aria-label={L.stopSubagent}
+            title={L.stopSubagent}
+            onClick={() => onStop(sub.id)}
+          >
+            <StopIcon size={12} />
+          </button>
+        )}
       </div>
       <div className="awr-subagent__activity">
         {sub.status === 'error'
           ? sub.error
-          : sub.status === 'done'
-            ? previewValue(sub.text, 160)
-            : `${sub.activity}${sub.toolCalls ? ` · ${L.toolCalls(sub.toolCalls)}` : ''}`}
+          : sub.status === 'stopped'
+            ? L.subagentStopped
+            : sub.status === 'done'
+              ? previewValue(sub.text, 160)
+              : `${sub.activity}${sub.toolCalls ? ` · ${L.toolCalls(sub.toolCalls)}` : ''}`}
       </div>
+    </li>
+  )
+}
+
+/** What the user said while the run was going, and where it reached the agent. */
+export const UserNoteRow = ({
+  note,
+  labels,
+}: {
+  note: UserNoteView
+  labels?: AgentLabelsOverride
+}) => {
+  const L = useLabels(labels)
+  return (
+    <li className={`awr-note awr-note--${note.at}`}>
+      <SendIcon size={12} className="awr-note__icon" />
+      <span className="awr-note__where">{L.noteAt[note.at]}</span>
+      <q className="awr-note__text">{note.text}</q>
     </li>
   )
 }
@@ -106,6 +146,8 @@ interface StepItemProps {
   step: StepView
   subagents: SubagentView[]
   approvals: ApprovalView[]
+  notes: UserNoteView[]
+  onStopSubagent?: (id: string) => void
   showToolCalls: boolean
   showUsage: boolean
   showThoughts: boolean
@@ -117,6 +159,8 @@ const StepItem = ({
   step,
   subagents,
   approvals,
+  notes,
+  onStopSubagent,
   showToolCalls,
   showUsage,
   showThoughts,
@@ -170,7 +214,14 @@ const StepItem = ({
     {subagents.length > 0 && (
       <ul className="awr-subagents">
         {subagents.map((sub) => (
-          <SubagentRow key={sub.id} sub={sub} />
+          <SubagentRow key={sub.id} sub={sub} onStop={onStopSubagent} />
+        ))}
+      </ul>
+    )}
+    {notes.length > 0 && (
+      <ul className="awr-notes">
+        {notes.map((n) => (
+          <UserNoteRow key={n.id} note={n} />
         ))}
       </ul>
     )}
@@ -184,6 +235,12 @@ export interface StepListProps {
   subagents?: SubagentView[]
   /** Consent decisions (`agent.approvals`) — shown under their step. */
   approvals?: ApprovalView[]
+  /** What the user said mid-run (`agent.notes`) — shown under the step it reached. */
+  notes?: UserNoteView[]
+  /** Show those notes (default true). */
+  showNotes?: boolean
+  /** Give a running subagent a stop button (`agent.stopSubagent`). */
+  onStopSubagent?: (id: string) => void
   /** Show each tool call (default true). */
   showToolCalls?: boolean
   /** Show each tool call's ≈tokens and duration (default true). */
@@ -204,6 +261,9 @@ export const StepList = ({
   steps,
   subagents = [],
   approvals = [],
+  notes = [],
+  showNotes = true,
+  onStopSubagent,
   showToolCalls = true,
   showUsage = true,
   showThoughts = true,
@@ -213,6 +273,10 @@ export const StepList = ({
 }: StepListProps) => {
   const L = useLabels(labels)
   if (steps.length === 0) return null
+  const known = new Set(steps.map((s) => s.id))
+  // A note tied to a step shows under it; one said before the answer (or whose step is
+  // gone) shows at the end.
+  const atEnd = showNotes ? notes.filter((n) => !n.stepId || !known.has(n.stepId)) : []
   return (
     <ol className={['awr-steps', className].filter(Boolean).join(' ')}>
       {steps.map((step) => (
@@ -221,6 +285,8 @@ export const StepList = ({
           step={step}
           subagents={subagents.filter((s) => s.stepId === step.id)}
           approvals={approvals.filter((a) => a.stepId === step.id && a.status !== 'pending')}
+          notes={showNotes ? notes.filter((n) => n.stepId === step.id) : []}
+          onStopSubagent={onStopSubagent}
           showToolCalls={showToolCalls}
           showUsage={showUsage}
           showThoughts={showThoughts}
@@ -228,6 +294,15 @@ export const StepList = ({
           L={L}
         />
       ))}
+      {atEnd.length > 0 && (
+        <li className="awr-step awr-step--notes">
+          <ul className="awr-notes">
+            {atEnd.map((n) => (
+              <UserNoteRow key={n.id} note={n} />
+            ))}
+          </ul>
+        </li>
+      )}
     </ol>
   )
 }

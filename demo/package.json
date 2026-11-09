@@ -20,7 +20,7 @@
     "@browser-ai/core": "^3.0.4",
     "@browser-ai/transformers-js": "^3.0.4",
     "@browser-ai/web-llm": "^3.0.4",
-    "@dudko.dev/agent-web": "^0.0.28",
+    "@dudko.dev/agent-web": "^0.0.29",
     "@dudko.dev/pdf-to-md-core": "^0.3.6",
     "@huggingface/transformers": "^4.3.2",
     "@mlc-ai/web-llm": "^0.2.87",

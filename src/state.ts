@@ -35,6 +35,12 @@ export type AgentAction =
     }
   /** Replace the transcript with a saved conversation (chat history). */
   | { type: 'load'; messages: ChatMessage[]; totalUsage?: IUsage }
+  /**
+   * The run is over and these messages never reached the model (`RunResult.undelivered`,
+   * or what was still queued when it was stopped). Clears the queue. An empty list
+   * clears `undelivered` too (the follow-up was sent, or the user discarded them).
+   */
+  | { type: 'undelivered'; texts: string[] }
 
 interface EventContext {
   at?: number
@@ -85,6 +91,9 @@ export const createInitialAgentState = (): AgentUiState => ({
   runMessageId: undefined,
   approvals: [],
   subagents: [],
+  queued: [],
+  notes: [],
+  undelivered: [],
   skills: [],
   discoveredTools: [],
   compactions: [],
@@ -228,7 +237,16 @@ const applyEvent = (state: AgentUiState, event: AgentEvent, ctx: EventContext): 
       }
 
     case 'plan.revised':
-      return { ...state, plan: event.plan, replan: { mode: 'revise', reason: event.reason } }
+      return {
+        ...state,
+        plan: event.plan,
+        // `replan.decision` came first: keep its "because the user spoke" flag.
+        replan: {
+          mode: 'revise',
+          reason: event.reason,
+          ...(state.replan?.byUser ? { byUser: true } : {}),
+        },
+      }
 
     case 'plan.step-added':
       // Execution is tracked from step.* events; the plan itself already
@@ -345,7 +363,38 @@ const applyEvent = (state: AgentUiState, event: AgentEvent, ctx: EventContext): 
       }
 
     case 'replan.decision':
-      return { ...state, replan: { mode: event.mode, reason: event.reason } }
+      return {
+        ...state,
+        replan: {
+          mode: event.mode,
+          reason: event.reason,
+          ...(event.byUser ? { byUser: true } : {}),
+        },
+      }
+
+    case 'message.queued':
+      return state.queued.some((q) => q.id === event.id)
+        ? state
+        : { ...state, queued: [...state.queued, { id: event.id, text: event.text }] }
+
+    case 'message.delivered': {
+      // Anchored where it landed: inside the executing step (between tool calls),
+      // after the step that just ended (a step boundary), or at the end (the answer).
+      const anchor =
+        event.at === 'round'
+          ? runningStepId(state.steps)
+          : event.at === 'step'
+            ? state.steps[state.steps.length - 1]?.id
+            : undefined
+      return {
+        ...state,
+        queued: state.queued.filter((q) => q.id !== event.id),
+        notes: [
+          ...state.notes,
+          { id: event.id, text: event.text, at: event.at, ...(anchor ? { stepId: anchor } : {}) },
+        ],
+      }
+    }
 
     case 'final.text-delta': {
       const finalText = state.finalText + event.delta
@@ -422,6 +471,7 @@ const applyEvent = (state: AgentUiState, event: AgentEvent, ctx: EventContext): 
             name: event.name,
             task: event.task,
             status: 'running',
+            ...(event.profile ? { profile: event.profile } : {}),
             stepId: runningStepId(state.steps),
             activity: 'starting',
             steps: 0,
@@ -457,8 +507,8 @@ const applyEvent = (state: AgentUiState, event: AgentEvent, ctx: EventContext): 
         ...state,
         subagents: patchSubagent(state.subagents, event.id, (s) => ({
           ...s,
-          status: 'error',
-          activity: 'failed',
+          status: event.stopped ? 'stopped' : 'error',
+          activity: event.stopped ? 'stopped' : 'failed',
           error: event.error,
         })),
       }
@@ -539,6 +589,7 @@ const syncRunMessage = (state: AgentUiState): AgentUiState => {
   const patch: Partial<ChatMessage> = {}
   if (m.steps !== state.steps) patch.steps = state.steps
   if (m.subagents !== state.subagents) patch.subagents = state.subagents
+  if (state.notes.length > 0 && m.notes !== state.notes) patch.notes = state.notes
   if (m.usage !== state.usage) patch.usage = state.usage
   if ((m.reasoning ?? '') !== state.finalReasoning) patch.reasoning = state.finalReasoning
   if (m.skills !== state.skills) patch.skills = state.skills
@@ -576,6 +627,8 @@ export const agentStateReducer = (state: AgentUiState, action: AgentAction): Age
         cap > 0 ? [...state.events, action.event].slice(-cap) : [...state.events, action.event]
       return { ...next, events }
     }
+    case 'undelivered':
+      return { ...state, queued: [], undelivered: action.texts }
     case 'load': {
       // Ids of the loaded messages must not collide with ones minted later.
       const maxSeq = action.messages.reduce((n, m) => {

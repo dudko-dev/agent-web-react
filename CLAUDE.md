@@ -29,7 +29,8 @@ The repo also contains a **Vite demo** (`demo/`) that is auto-deployed to
 
 - `src/state.ts` — the pure `agentStateReducer` + `createInitialAgentState`.
 - `src/types.ts` — `AgentUiState`, `ChatMessage`, `StepView`, `ToolCallView`, …
-- `src/hooks/` — `use-agent` (the hook), `use-credentials` (vault),
+- `src/hooks/` — `use-agent` (the hook; `send` / `stopSubagent` steer a running agent
+  through the core's `RunControl`), `use-credentials` (vault),
   `use-local-model` (any on-device runtime as an engine) + `use-webllm-model`
   (its WebLLM engine), `use-mcp` (remote MCP + OAuth round-trip),
   `use-mcp-servers` (several servers), `use-chat-history`, `use-virtual-files`,

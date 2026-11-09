@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import type { AgentEvent, IUsage } from '@dudko.dev/agent-web'
 import {
   agentStateReducer,
@@ -15,6 +17,9 @@ import {
   newChatId,
   noticesOf,
   parseSlash,
+  steerIntent,
+  StepList,
+  SubagentRow,
   usageLine,
   withAttachments,
   type AgentAction,
@@ -22,6 +27,9 @@ import {
   type ChatMessage,
   type ComposerAttachment,
   type SlashCommand,
+  type StepView,
+  type SubagentView,
+  type UserNoteView,
 } from '../dist/index.js'
 
 const usage = (input: number, output: number, extra: Partial<IUsage> = {}): IUsage => ({
@@ -257,4 +265,103 @@ test('usageLine shows tokens by kind and the duration', () => {
     'in 12k · out 456 · think 120 · cached 9.0k · 4.2 s',
   )
   assert.equal(usageLine(undefined), '')
+})
+
+// ── steering a run that is going ─────────────────────────────────────────────
+
+test('steerIntent: while the agent works, text goes TO it; the rest waits', () => {
+  const base = { busy: true, steering: true, hasAttachments: false }
+  // Idle: not this helper's business.
+  assert.equal(steerIntent({ ...base, busy: false, raw: 'hello' }), 'idle')
+  assert.equal(steerIntent({ ...base, busy: false, raw: '' }), 'idle')
+
+  assert.equal(steerIntent({ ...base, raw: 'use the staging database' }), 'steer')
+  assert.equal(steerIntent({ ...base, raw: '' }), 'ignore', 'nothing typed')
+  // A path is a message; "/command" is not.
+  assert.equal(steerIntent({ ...base, raw: '/etc/hosts is the file' }), 'steer')
+  assert.equal(steerIntent({ ...base, raw: '/stop' }), 'ignore')
+  assert.equal(steerIntent({ ...base, raw: '/' }), 'ignore')
+  // Files cannot join a run that is going - with or without text.
+  assert.equal(steerIntent({ ...base, raw: 'see this', hasAttachments: true }), 'attachments')
+  assert.equal(steerIntent({ ...base, raw: '', hasAttachments: true }), 'attachments')
+  // A host that switched steering off gets the old behaviour.
+  assert.equal(steerIntent({ ...base, steering: false, raw: 'hello' }), 'ignore')
+  assert.equal(steerIntent({ ...base, steering: false, raw: '' }), 'ignore')
+})
+
+test('labels: the steering texts have defaults, and where a note landed can be overridden one by one', () => {
+  assert.equal(defaultLabels.noteAt.round, 'you said, between tool calls')
+  assert.equal(defaultLabels.undelivered(1), 'Not delivered (1 message)')
+  assert.equal(defaultLabels.undelivered(3), 'Not delivered (3 messages)')
+
+  const L = mergeLabels(defaultLabels, { noteAt: { step: 'вы сказали, после шага' } } as never)
+  assert.equal(L.noteAt.step, 'вы сказали, после шага')
+  assert.equal(L.noteAt.round, defaultLabels.noteAt.round, 'the others are kept')
+  assert.equal(L.noteAt.final, defaultLabels.noteAt.final)
+})
+
+// ── markup of the steering parts (server-rendered: no DOM needed) ────────────
+
+const sub = (over: Partial<SubagentView> = {}): SubagentView => ({
+  id: 'k1',
+  name: 'analyst',
+  task: 'weigh e4',
+  status: 'running',
+  activity: 'step 1/1: look',
+  steps: 1,
+  toolCalls: 0,
+  text: '',
+  usage: usage(0, 0),
+  ...over,
+})
+const html = (node: Parameters<typeof renderToStaticMarkup>[0]): string =>
+  renderToStaticMarkup(node)
+
+test('SubagentRow: a running subagent gets a stop button only when the host wires one', () => {
+  const stopped: string[] = []
+  const withStop = html(
+    createElement(SubagentRow, { sub: sub(), onStop: (id) => stopped.push(id) }),
+  )
+  assert.match(withStop, /aria-label="Stop this subagent"/)
+  assert.doesNotMatch(html(createElement(SubagentRow, { sub: sub() })), /Stop this subagent/)
+  // Only while it runs.
+  for (const status of ['done', 'error', 'stopped'] as const) {
+    const done = html(
+      createElement(SubagentRow, { sub: sub({ status, text: 'x' }), onStop: () => {} }),
+    )
+    assert.doesNotMatch(done, /Stop this subagent/, status)
+  }
+  assert.match(
+    html(createElement(SubagentRow, { sub: sub({ status: 'stopped' }) })),
+    /awr-subagent--stopped[\s\S]*stopped/,
+  )
+  assert.match(html(createElement(SubagentRow, { sub: sub({ profile: 'deep' }) })), />deep</)
+})
+
+test('StepList: a note sits under the step it reached; one without a step goes at the end', () => {
+  const st = (id: string, index: number) =>
+    ({
+      id,
+      index,
+      total: 2,
+      step: { id, description: `Step ${id}` },
+      text: '',
+      reasoning: '',
+      toolCalls: [],
+      status: 'done',
+      blocked: false,
+    }) as StepView
+  const notes: UserNoteView[] = [
+    { id: 'n1', text: 'during A', at: 'round', stepId: 'a' },
+    { id: 'n2', text: 'before the answer', at: 'final' },
+  ]
+  const out = html(createElement(StepList, { steps: [st('a', 1), st('b', 2)], notes }))
+  const at = (s: string) => out.indexOf(s)
+  assert.ok(at('Step a') < at('during A') && at('during A') < at('Step b'), 'under step a')
+  assert.ok(at('Step b') < at('before the answer'), 'the unanchored one is last')
+  assert.match(out, /you said, between tool calls/)
+  assert.match(out, /you said, before the answer/)
+  // Hosts can hide them.
+  const hidden = html(createElement(StepList, { steps: [st('a', 1)], notes, showNotes: false }))
+  assert.doesNotMatch(hidden, /during A|before the answer/)
 })

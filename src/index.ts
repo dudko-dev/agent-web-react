@@ -46,8 +46,15 @@ export {
   attachmentRefusal,
   formatElapsed,
   noticesOf,
+  steerIntent,
 } from './composer.js'
-export type { SlashCommand, ComposerAttachment, ComposerNotice, NoticeTexts } from './composer.js'
+export type {
+  SlashCommand,
+  ComposerAttachment,
+  ComposerNotice,
+  NoticeTexts,
+  SteerIntent,
+} from './composer.js'
 export { downscaleImage } from './image-resize.js'
 export type { DownscaleOptions } from './image-resize.js'
 
@@ -61,6 +68,8 @@ export type { AgentAction } from './state.js'
 export type {
   AgentUiState,
   AgentStatus,
+  QueuedMessageView,
+  UserNoteView,
   ApprovalView,
   BudgetView,
   ChatAttachment,
@@ -98,7 +107,7 @@ export { Composer } from './components/Composer.js'
 export type { ComposerProps } from './components/Composer.js'
 export { PlanView } from './components/PlanView.js'
 export type { PlanViewProps } from './components/PlanView.js'
-export { StepList, SubagentRow, ToolCallRow } from './components/StepList.js'
+export { StepList, SubagentRow, ToolCallRow, UserNoteRow } from './components/StepList.js'
 export type { StepListProps, ToolCallRowProps, RenderToolCall } from './components/StepList.js'
 export { ToolApprovalPrompt } from './components/ToolApprovalPrompt.js'
 export type { ToolApprovalPromptProps } from './components/ToolApprovalPrompt.js'
@@ -121,6 +130,7 @@ export {
   defineSkill,
   parseSkillMarkdown,
   loadSkillFromUrl,
+  createRunControl,
   createSubagentTool,
   serveSubagentWorker,
   markReadOnly,
@@ -141,8 +151,10 @@ export {
 } from '@dudko.dev/agent-web'
 export type {
   Agent,
+  RunControl,
   RunOptions,
   RunResult,
+  SubagentInfo,
   BrowserAgentConfig,
   AgentEvent,
   AgentEventHandler,

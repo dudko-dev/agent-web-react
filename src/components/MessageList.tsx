@@ -18,6 +18,10 @@ export interface MessageListProps {
   showUsage?: boolean
   /** Thoughts (step + answer) when the model thinks (default true). */
   showThoughts?: boolean
+  /** What the user said while the agent worked, under the step it reached (default true). */
+  showNotes?: boolean
+  /** Give a running subagent a stop button (`useAgent().stopSubagent`). */
+  onStopSubagent?: (id: string) => void
   /** Open the activity of finished answers too (default: only while it runs). */
   activityOpen?: boolean
   /** Extra content under the latest assistant turn while it streams (plan thought, …). */
@@ -87,6 +91,8 @@ export const MessageList = ({
   showToolCalls = true,
   showUsage = true,
   showThoughts = true,
+  showNotes = true,
+  onStopSubagent,
   activityOpen = false,
   liveExtra,
   renderContent,
@@ -124,6 +130,9 @@ export const MessageList = ({
                     steps={steps}
                     subagents={m.subagents}
                     approvals={m.approvals}
+                    notes={m.notes}
+                    showNotes={showNotes}
+                    onStopSubagent={m.pending ? onStopSubagent : undefined}
                     showToolCalls={showToolCalls}
                     showUsage={showUsage}
                     showThoughts={showThoughts}

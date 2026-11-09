@@ -44,6 +44,8 @@ export interface ChatMessage {
   approvals?: ApprovalView[]
   /** Assistant turn: subagent delegations of the run. */
   subagents?: SubagentView[]
+  /** Assistant turn: what the user said while the run was going, and where it reached the agent. */
+  notes?: UserNoteView[]
   /** Assistant turn: the synthesizer's thoughts. */
   reasoning?: string
   /** Assistant turn: tokens the run spent, by kind. */
@@ -87,12 +89,35 @@ export interface ApprovalView {
   automatic?: boolean
 }
 
+/** A message sent to the agent while it works, still waiting for a boundary to be shown to the model. */
+export interface QueuedMessageView {
+  id: string
+  text: string
+}
+
+/**
+ * A message the user sent while the run was going, after it reached the agent.
+ * `at` says where: `round` = between tool calls inside a step, `step` = at the end
+ * of a step (the replanner then re-checked the plan), `final` = just before the
+ * answer was written.
+ */
+export interface UserNoteView {
+  id: string
+  text: string
+  at: 'round' | 'step' | 'final'
+  /** The step it was delivered in (`round`) or after (`step`); none for `final`. */
+  stepId?: string
+}
+
 /** A delegated task running in a subagent (in-process or a Web Worker). */
 export interface SubagentView {
   id: string
   name: string
   task: string
-  status: 'running' | 'done' | 'error'
+  /** `stopped`: the user stopped this subagent; the run went on without it. */
+  status: 'running' | 'done' | 'error' | 'stopped'
+  /** The profile the parent model chose for this delegation, when there are profiles. */
+  profile?: string
   /** The step that delegated it, when known. */
   stepId?: string
   /** What the child is doing right now ("step 2: …", "→ tool"). */
@@ -139,6 +164,8 @@ export interface ModelLoadState {
 export interface ReplanState {
   mode: ReplanMode
   reason: string
+  /** The replanner ran because the user sent a message, not because a step failed. */
+  byUser?: boolean
 }
 
 /**
@@ -165,6 +192,16 @@ export interface AgentUiState {
   approvals: ApprovalView[]
   /** Subagent delegations of this run. */
   subagents: SubagentView[]
+  /** Messages sent while the run goes that have not yet been shown to the model. */
+  queued: QueuedMessageView[]
+  /** What the user said during this run and when it reached the agent. */
+  notes: UserNoteView[]
+  /**
+   * Messages the run ended without showing the model (sent while the answer was being
+   * written, or still queued when the run was stopped). The hook sends them as a
+   * follow-up unless the run was stopped; see `useAgent`'s `followUp`.
+   */
+  undelivered: string[]
   /** Skills activated in this run. */
   skills: string[]
   /** Tools activated by find_tools in this run. */

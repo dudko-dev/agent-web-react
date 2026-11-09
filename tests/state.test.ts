@@ -269,3 +269,166 @@ test('skills, discovered tools, compactions and budget stops are recorded per ru
   assert.deepEqual(s.skills, [])
   assert.equal(s.budget, undefined)
 })
+
+// ── steering a run that is going ─────────────────────────────────────────────
+
+const stepA = { id: 'a', description: 'Fetch it' }
+const stepB = { id: 'b', description: 'Report it' }
+const startedRun = (): AgentUiState => {
+  let s = createInitialAgentState()
+  s = event(s, { type: 'run.start', goal: 'go' })
+  s = event(s, { type: 'plan.created', plan: { thought: '', steps: [stepA, stepB] } })
+  return event(s, { type: 'step.start', step: stepA, index: 1, total: 2 })
+}
+const completeStep = (s: AgentUiState, st: typeof stepA): AgentUiState =>
+  event(s, {
+    type: 'step.complete',
+    step: st,
+    result: { step: st, summary: 'ok', blocked: false, toolCalls: [] },
+  })
+
+test('a message sent mid-run waits in the queue until the agent has shown it to the model', () => {
+  let s = startedRun()
+  s = event(s, { type: 'message.queued', id: 'msg-1', text: 'use the staging database' })
+  assert.deepEqual(s.queued, [{ id: 'msg-1', text: 'use the staging database' }])
+  assert.deepEqual(s.notes, [], 'not a note yet: the model has not seen it')
+  // A repeated announcement is not a second message.
+  s = event(s, { type: 'message.queued', id: 'msg-1', text: 'use the staging database' })
+  assert.equal(s.queued.length, 1)
+
+  s = event(s, {
+    type: 'message.delivered',
+    id: 'msg-1',
+    text: 'use the staging database',
+    at: 'round',
+  })
+  assert.deepEqual(s.queued, [])
+  assert.deepEqual(s.notes, [
+    { id: 'msg-1', text: 'use the staging database', at: 'round', stepId: 'a' },
+  ])
+})
+
+test('a note is anchored where it landed: the running step, the step just ended, or the end', () => {
+  let s = startedRun()
+  s = event(s, { type: 'message.queued', id: 'm1', text: 'between tool calls' })
+  s = event(s, { type: 'message.delivered', id: 'm1', text: 'between tool calls', at: 'round' })
+  s = completeStep(s, stepA)
+  s = event(s, { type: 'message.queued', id: 'm2', text: 'at the boundary' })
+  s = event(s, { type: 'message.delivered', id: 'm2', text: 'at the boundary', at: 'step' })
+  s = event(s, { type: 'message.queued', id: 'm3', text: 'before the answer' })
+  s = event(s, { type: 'message.delivered', id: 'm3', text: 'before the answer', at: 'final' })
+  assert.deepEqual(
+    s.notes.map((n) => [n.id, n.at, n.stepId]),
+    [
+      ['m1', 'round', 'a'],
+      ['m2', 'step', 'a'],
+      ['m3', 'final', undefined],
+    ],
+  )
+  assert.ok(!('stepId' in s.notes[2]), 'a final note is not tied to any step')
+})
+
+test('notes are kept on the assistant turn, so a later run does not take them away', () => {
+  let s = startedRun()
+  s = event(s, { type: 'message.queued', id: 'm1', text: 'mind the budget' })
+  s = event(s, { type: 'message.delivered', id: 'm1', text: 'mind the budget', at: 'round' })
+  const assistant = s.messages[s.messages.length - 1]
+  assert.deepEqual(
+    assistant.notes?.map((n) => n.text),
+    ['mind the budget'],
+  )
+
+  s = event(s, { type: 'final', text: 'done' })
+  s = event(s, { type: 'run.start', goal: 'next' })
+  assert.deepEqual(s.notes, [], 'the live view starts clean')
+  assert.deepEqual(s.queued, [])
+  assert.deepEqual(
+    s.messages[1].notes?.map((n) => n.text),
+    ['mind the budget'],
+    'the old turn keeps it',
+  )
+  assert.equal(s.messages[3].notes, undefined, 'and the new one has none')
+})
+
+test('a replan caused by a message says so, and a revise keeps that', () => {
+  let s = startedRun()
+  s = event(s, {
+    type: 'replan.decision',
+    mode: 'revise',
+    reason: 'the user changed course',
+    byUser: true,
+  })
+  assert.deepEqual(s.replan, { mode: 'revise', reason: 'the user changed course', byUser: true })
+  s = event(s, {
+    type: 'plan.revised',
+    plan: { thought: '', steps: [stepB] },
+    reason: 'the user changed course',
+  })
+  assert.equal(
+    s.replan?.byUser,
+    true,
+    'plan.revised follows the decision and must not lose the flag',
+  )
+
+  // An ordinary failure-driven replan carries no such flag.
+  let t = startedRun()
+  t = event(t, { type: 'replan.decision', mode: 'continue', reason: 'fits' })
+  assert.deepEqual(t.replan, { mode: 'continue', reason: 'fits' })
+})
+
+test('a subagent the user stopped is "stopped", not "error"; its profile is shown', () => {
+  let s = startedRun()
+  s = event(s, {
+    type: 'subagent.start',
+    id: 'k1',
+    name: 'researcher',
+    task: 'dig',
+    profile: 'deep',
+  })
+  s = event(s, { type: 'subagent.start', id: 'k2', name: 'researcher', task: 'skim' })
+  assert.equal(s.subagents[0].profile, 'deep')
+  assert.ok(!('profile' in s.subagents[1]), 'no profile chosen, none shown')
+
+  s = event(s, {
+    type: 'subagent.error',
+    id: 'k1',
+    name: 'researcher',
+    error: 'stopped by the user',
+    stopped: true,
+  })
+  s = event(s, { type: 'subagent.error', id: 'k2', name: 'researcher', error: 'boom' })
+  assert.deepEqual(
+    s.subagents.map((x) => [x.id, x.status, x.activity]),
+    [
+      ['k1', 'stopped', 'stopped'],
+      ['k2', 'error', 'failed'],
+    ],
+  )
+  // Mirrored onto the turn like any other subagent state.
+  assert.equal(s.messages[s.messages.length - 1].subagents?.[0].status, 'stopped')
+})
+
+test('undelivered: the hook reports what the run never showed the agent; it also empties the queue', () => {
+  let s = startedRun()
+  s = event(s, { type: 'message.queued', id: 'm1', text: 'too late' })
+  assert.equal(s.queued.length, 1)
+  s = agentStateReducer(s, { type: 'undelivered', texts: ['too late'] })
+  assert.deepEqual(s.undelivered, ['too late'])
+  assert.deepEqual(s.queued, [], 'handed over, no longer "waiting"')
+  s = agentStateReducer(s, { type: 'undelivered', texts: [] })
+  assert.deepEqual(s.undelivered, [])
+  // A new run starts without them.
+  s = agentStateReducer(s, { type: 'undelivered', texts: ['again'] })
+  s = event(s, { type: 'run.start', goal: 'next' })
+  assert.deepEqual(s.undelivered, [])
+})
+
+test('reset and load clear the steering state too', () => {
+  let s = startedRun()
+  s = event(s, { type: 'message.queued', id: 'm1', text: 'x' })
+  s = agentStateReducer(s, { type: 'undelivered', texts: ['y'] })
+  const reset = agentStateReducer(s, { type: 'reset' })
+  assert.deepEqual([reset.queued, reset.notes, reset.undelivered], [[], [], []])
+  const loaded = agentStateReducer(s, { type: 'load', messages: [] })
+  assert.deepEqual([loaded.queued, loaded.notes, loaded.undelivered], [[], [], []])
+})

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { DependencyList } from 'react'
 import {
   createAgent,
+  createRunControl,
   type IUsage,
   type Agent,
   type AgentEventHandler,
   type BrowserAgentConfig,
   type CompactResult,
+  type RunControl,
   type RunFile,
   type RunResult,
   type ToolApprovalDecision,
@@ -40,6 +42,13 @@ export interface UseAgentOptions {
    * (default true). Render them with `<ToolApprovalPrompt>`, or your own UI.
    */
   approvals?: boolean
+  /**
+   * What the run never showed the agent — a message sent while the answer was being
+   * written — is sent as the next message, once the run has ended (default true).
+   * A run the user stopped never does this: those messages stay in `undelivered`
+   * for the UI to offer (`sendUndelivered` / `discardUndelivered`).
+   */
+  followUp?: boolean
 }
 
 export interface ApproveOptions {
@@ -66,6 +75,19 @@ export interface UseAgentReturn extends AgentUiState {
   run: (goal: string, options?: RunGoalOptions) => Promise<RunResult | undefined>
   /** Abort the in-flight run (observed between phases and mid-stream). */
   stop: () => void
+  /**
+   * Say something to the agent while it works. It is shown to the model at the next
+   * boundary (between tool calls, or when the step ends — where the replanner then
+   * re-checks the plan), never cutting a tool call short. `false` when no run is in
+   * flight or the text is empty — then use `run`. Watch `queued` / `notes`.
+   */
+  send: (text: string) => boolean
+  /** Stop ONE running subagent (`SubagentView.id`); the run and its siblings go on. */
+  stopSubagent: (id: string) => boolean
+  /** Send the `undelivered` messages (a stopped run's leftovers) as a new message. */
+  sendUndelivered: () => void
+  /** Drop the `undelivered` messages. */
+  discardUndelivered: () => void
   /** Clear the whole conversation — transcript, current run, and the agent's memory. */
   reset: () => void
   /** Rebuild the agent now (e.g. after the user stores a new API key). */
@@ -120,6 +142,10 @@ export const useAgent = (
   const [state, dispatch] = useReducer(agentStateReducer, undefined, createInitialAgentState)
   const agentRef = useRef<Agent | undefined>(undefined)
   const abortRef = useRef<AbortController | undefined>(undefined)
+  // The in-flight run's control: how `send` and `stopSubagent` reach it.
+  const controlRef = useRef<RunControl | undefined>(undefined)
+  const stateRef = useRef(state)
+  stateRef.current = state
   const [generation, setGeneration] = useState(0)
 
   // Keep the latest callbacks/config without forcing an agent rebuild.
@@ -227,16 +253,26 @@ export const useAgent = (
     [settleAll],
   )
 
+  // `run` calls itself (the follow-up of a run), so it is reached through a ref.
+  const runRef = useRef<
+    ((goal: string, runOptions?: RunGoalOptions) => Promise<RunResult | undefined>) | undefined
+  >(undefined)
+
   const run = useCallback(
     async (goal: string, runOptions?: RunGoalOptions): Promise<RunResult | undefined> => {
       const agent = agentRef.current
       if (!agent || abortRef.current) return undefined // not ready, or already running
       const controller = new AbortController()
       abortRef.current = controller
+      const control = createRunControl()
+      controlRef.current = control
+      // What the run never showed the agent; read once it is over.
+      let left: string[] = []
       dispatch({ type: 'status', status: 'running' })
       try {
-        return await agent.run(goal, {
+        const result = await agent.run(goal, {
           signal: controller.signal,
+          control,
           sessionId: sessionRef.current,
           ...(runOptions?.images?.length ? { images: runOptions.images } : {}),
           ...(runOptions?.files?.length ? { files: runOptions.files } : {}),
@@ -259,7 +295,10 @@ export const useAgent = (
             }
           },
         })
+        left = result.undelivered ?? []
+        return result
       } catch (err) {
+        left = control.pending()
         dispatch({
           type: 'event',
           event: { type: 'error', phase: 'run', error: errMessage(err) },
@@ -268,13 +307,39 @@ export const useAgent = (
         return undefined
       } finally {
         abortRef.current = undefined
+        controlRef.current = undefined
         settleAll({ approved: false, reason: 'the run ended' })
         // Whatever the agent did meanwhile: rebuilt, still building, or gone.
         dispatch({ type: 'status', ...buildStatusRef.current })
+        if (left.length > 0) {
+          if (!controller.signal.aborted && optionsRef.current.followUp !== false) {
+            // Said too late for this run: just send it next.
+            dispatch({ type: 'undelivered', texts: [] })
+            void runRef.current?.(left.join('\n\n'))
+          } else {
+            dispatch({ type: 'undelivered', texts: left })
+          }
+        } else {
+          dispatch({ type: 'undelivered', texts: [] })
+        }
       }
     },
     [settleAll],
   )
+  runRef.current = run
+
+  const send = useCallback((text: string): boolean => controlRef.current?.send(text) ?? false, [])
+  const stopSubagent = useCallback(
+    (id: string): boolean => controlRef.current?.stopSubagent(id) ?? false,
+    [],
+  )
+  const sendUndelivered = useCallback(() => {
+    const texts = stateRef.current.undelivered
+    if (texts.length === 0) return
+    dispatch({ type: 'undelivered', texts: [] })
+    void runRef.current?.(texts.join('\n\n'))
+  }, [])
+  const discardUndelivered = useCallback(() => dispatch({ type: 'undelivered', texts: [] }), [])
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
@@ -335,6 +400,10 @@ export const useAgent = (
     ...state,
     run,
     stop,
+    send,
+    stopSubagent,
+    sendUndelivered,
+    discardUndelivered,
     reset,
     reload,
     agent: agentRef.current,
