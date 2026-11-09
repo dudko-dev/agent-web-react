@@ -155,8 +155,11 @@ export const useSettingsConfig = (s: DemoSettings, modelWindow: number | undefin
       compaction: {
         auto: s.autoCompact,
         contextWindowTokens: window,
-        // Small on purpose so the demo shows compaction within a few turns.
-        thresholdTokens: Math.min(6_000, Math.floor(window / 2)),
+        // Low enough that the demo shows compaction within a handful of turns, but well above the
+        // fixed prompt: since core 0.0.32 the instructions, tool definitions and skills count
+        // towards it, and a threshold under them would compact on every run. A small window gets
+        // the core's own 85%.
+        thresholdTokens: Math.min(24_000, Math.floor(window * 0.85)),
         keepRecentTurns: 4,
       },
       // Fast answers: the executor's reply is the answer — no synthesizer call,
