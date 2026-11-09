@@ -167,6 +167,29 @@ Labels: `placeholderBusy`, `steer`, `noAttachmentsWhileBusy`, `queuedWaiting`, `
 `undelivered`, `sendUndelivered`, `discardUndelivered`, `stopSubagent`, `subagentStopped`.
 A replan caused by a message has `replan.byUser === true`.
 
+## The agent's notebook, and what it fetched
+
+With `learning` in the agent's config (core: `learning: true`, or `{ store: new VfsSkillStore(files) }`
+to keep lessons as `SKILL.md` in the workspace) the agent writes down what it figured out. The UI
+follows it:
+
+- **The turn** says what the agent learned in that answer ("learned: image-format-jpg") and, with
+  `egress`, what it fetched - each request with its status, a refused one with the reason
+  ("refused: not on the allow list"). Hide it with `showLearned={false}` (chat / message list).
+- **`<LearnedSkills />`** is the notebook itself: each lesson with when it applies, its revision
+  and where it came from (the sources it named, the pages it read), and a button to forget it.
+  Place it anywhere - a settings panel, a sidebar (`slots.sidebar`). Props: `controller`
+  (default: the provider's), `lessons` (to show your own list), `onForget` (default
+  `controller.forgetSkill`; `false` = read-only), `showSources`, `hideTitle`, `empty`, `labels`.
+- **State:** `learned` (the notebook, `LessonView[]`) belongs to the agent, not to a conversation -
+  it survives `reset` and a chat switch, and the hook re-reads it whenever the agent is rebuilt (so
+  a store that persists brings its lessons back). `learnedNow` / `fetches` are the current run's;
+  each assistant message keeps its own `learned` / `fetches`. `useAgent().forgetSkill(name)`
+  deletes one.
+
+Labels: `learnedNow`, `fetches`, `fetchRefused`, `notebookTitle`, `notebookEmpty`, `notebookForget`,
+`notebookRevision`, `notebookFrom`.
+
 ## Attachments: images, PDFs, files, URLs
 
 What the composer does with each file:
@@ -279,8 +302,9 @@ tokens inside an element with class `awr-theme`.
 
 | | |
 | --- | --- |
-| `useAgent` | the agent, its UI state, `run(goal, { images, files, attachments, label })`, `send` / `stopSubagent` (steer a running agent), consent, `compact`, `sessionId`, `loadChat` |
+| `useAgent` | the agent, its UI state, `run(goal, { images, files, attachments, label })`, `send` / `stopSubagent` (steer a running agent), `forgetSkill` (the notebook), consent, `compact`, `sessionId`, `loadChat` |
 | `useChatHistory` | saved chats over a `ChatHistoryStore` |
+| `lessonsOf` | the agent's own skills (`agent.listLearnedSkills()`) as `LessonView[]` - what the hook seeds the notebook with |
 | `useVirtualFiles` | a live listing of a `VirtualFileSystem` + upload / remove / read |
 | `useSpeechToText` | Web Speech API: `{ supported, listening, interim, start, stop, toggle }` |
 | `useMcpServers` | several MCP servers, merged tools — import from `@dudko.dev/agent-web-react/mcp` |

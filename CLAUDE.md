@@ -52,7 +52,8 @@ The repo also contains a **Vite demo** (`demo/`) that is auto-deployed to
 - `src/components/` — `AgentChat` (panel: history sidebar, transcript,
   composer, files panel; slots / render props / components / theme),
   `AgentComposer`, `MessageList`, `StepList` (+ `ToolCallRow`),
-  `ToolApprovalPrompt`, `ApprovalModeSwitch`, `ChatHistoryList`, `FilesPanel`,
+  `ToolApprovalPrompt`, `ApprovalModeSwitch`, `ChatHistoryList`, `FilesPanel`, `LearnedSkills`
+  (the agent's notebook: `learned` in the state belongs to the agent, not the conversation),
   `ContextMeter`, `Composer` (minimal), `PlanView`, `ModelLoadBar`,
   `UsageBadge`, `ApiKeyForm`, `icons`, `format`. Docs: `docs/chat.md`.
 - `demo/src/components/McpPanel.tsx` — the demo's "bring your own MCP" panel.

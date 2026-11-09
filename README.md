@@ -37,7 +37,10 @@ app with a single hook and (optionally) a set of pre-styled components:
 > one edits a sticky-notes board, one drives any number of MCP servers (plus a
 > 185-tool mock catalogue to show tool search), and one plays chess against you
 > — your move triggers it, analyst subagents run in Web Workers. Cloud BYOK or
-> local WebGPU, all in your browser. Source in [`demo/`](demo/).
+> local WebGPU, all in your browser. Settings turn on tool consent, thinking, token
+> and step limits, compaction, skills - the agent's own **notebook** (it writes down
+> what it figured out, in the workspace, across reloads) and **web access** limited
+> to hosts you list. Type to the agent while it works. Source in [`demo/`](demo/).
 
 ## Install
 
@@ -421,6 +424,7 @@ use them standalone. The full guide: [docs/chat.md](docs/chat.md).
 | `<ApprovalModeSwitch>` | Segmented consent-mode switch. |
 | `<ChatHistoryList>` | Saved chats (from `useChatHistory`). |
 | `<FilesPanel>` | A `VirtualFileSystem`, live: preview, download, delete, upload. |
+| `<LearnedSkills>` | The agent's notebook (`learning`): its lessons, where each came from, forget. |
 | `<ContextMeter>` | Tokens by kind, budget bar, last compaction, Compact. |
 | `<PlanView>` | A plan's reasoning + step list. |
 | `<ModelLoadBar>` | WebLLM download/init progress. |
@@ -473,7 +477,10 @@ from one place.
   kind in the transcript, a chat saved and restored after a reload, an image
   attached (shown, sent as a file part, saved in the workspace), a file
   dropped anywhere on the page, consent in "Ask" mode, slash commands, the
-  chess move that triggers the agent, and Russian labels. The MCP and authorization servers it
+  chess move that triggers the agent, and Russian labels; the agent's
+  notebook (a lesson written, kept in the workspace across a reload, seen by the
+  planner, forgotten on request) and web access (off by default; an allowed page
+  is read, a metadata address is refused). The MCP and authorization servers it
 talks to are started on loopback by [`e2e/servers.ts`](e2e/servers.ts), CORS
 headers included — so the test also pins the deployment requirement that the
 challenge header be exposed.
