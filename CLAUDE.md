@@ -57,14 +57,17 @@ The repo also contains a **Vite demo** (`demo/`) that is auto-deployed to
   `ContextMeter`, `Composer` (minimal), `PlanView`, `ModelLoadBar`,
   `UsageBadge`, `ApiKeyForm`, `icons`, `format`. Docs: `docs/chat.md`.
 - `demo/src/components/McpPanel.tsx` — the demo's "bring your own MCP" panel.
+- `src/util.ts` — tiny shared helpers (`errMessage`).
 - `src/styles.css` — optional theme (light + dark).
 - `src/index.ts` — public surface (+ curated re-exports from the core).
 - `tests/state.test.ts`, `tests/chat.test.ts` — `node --test` over the reducer,
   composer helpers, labels and the history store (imports from `dist`).
-- `e2e/` — Playwright over the built demo: MCP (several servers, the OAuth
-  redirect round-trip, IndexedDB reuse, CORS — `servers.ts` starts a real MCP
-  server + authorization server on loopback) and the agent end to end against
-  a scripted Gemini endpoint (`gemini.ts`, routed by the stage markers).
+- `e2e/` — Playwright over the built demo. `mcp.spec.ts`: MCP (several servers, the OAuth
+  redirect round-trip, IndexedDB reuse, CORS — `servers.ts` starts a real MCP server + authorization
+  server on loopback). `agent.spec.ts`, `steering.spec.ts`, `learning.spec.ts`: the agent end to end
+  (a run, typing to it while it works, the notebook and the fetched pages) against a scripted Gemini
+  endpoint (`gemini.ts`, routed by the stage markers; it can script tool calls and the notebook's
+  `save_skill`).
 - `demo/` — the Vite + React demo (aliases the library to `../dist`).
 
 ## Commands
@@ -100,5 +103,8 @@ publishes to npm via Trusted Publishing after CI passes on `main`. Pages
 - Every user-visible string goes through `labels` (add it to `AgentLabels` and
   `defaultLabels`); every new part of a component gets a `show*` prop or a
   render prop / slot — hosts must be able to hide, relabel or replace it.
+- Docs ship in the npm package: a new prop, hook field, exported type or label goes in the README
+  (hook table / components table) and `docs/chat.md`. `tests/chat.test.ts` fails when a label key is not
+  listed in `docs/chat.md`'s label reference.
 - Don't import model providers, `ai`, or `zod` at runtime here — the core owns
   them. Type-only imports from `@dudko.dev/agent-web` are fine.

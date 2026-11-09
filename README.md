@@ -15,9 +15,14 @@ app with a single hook and (optionally) a set of pre-styled components:
   chip and speech to text; saved chats in IndexedDB and a workspace (virtual
   file system) panel. Everything is a prop: show/hide, labels (i18n), render
   props, slots, swappable components, theme — see [docs/chat.md](docs/chat.md).
+- 🗣️ **Steering and learning** — type to the agent while it works (`send`,
+  `stopSubagent`; queued / delivered notes under the step that got them), and watch
+  it keep a notebook: lessons it wrote down as skills (`learned`, `<LearnedSkills>`,
+  `forgetSkill`) and the pages it fetched — see
+  [docs/chat.md](docs/chat.md#talking-to-the-agent-while-it-works).
 - 🧩 **Building blocks** — `<AgentComposer>`, `<MessageList>`, `<StepList>`,
-  `<ToolApprovalPrompt>`, `<ChatHistoryList>`, `<FilesPanel>`, `<ContextMeter>`,
-  `<ModelLoadBar>`, `<UsageBadge>`, `<ApiKeyForm>`; hooks `useChatHistory`,
+  `<ToolApprovalPrompt>`, `<ApprovalModeSwitch>`, `<ChatHistoryList>`, `<FilesPanel>`,
+  `<LearnedSkills>`, `<ContextMeter>`, `<PlanView>`, `<ModelLoadBar>`, `<UsageBadge>`, `<ApiKeyForm>`; hooks `useChatHistory`,
   `useVirtualFiles`, `useSpeechToText`; MCP hooks `useMcp` / `useMcpServers` live in
   [`@dudko.dev/agent-web-react/mcp`](#mcp-hooks-live-in-their-own-subpath).
 - 🔑 **`useCredentials`** — store BYOK API keys **encrypted at rest**
@@ -173,6 +178,9 @@ function Custom() {
 | --- | --- |
 | `run(goal, { images, files, attachments, label })` | Start a run (with attachments); resolves with the `RunResult` |
 | `stop()` | Abort the in-flight run |
+| `agent` | the core `Agent` itself (or `undefined` until built): `agent.usage` / `agent.sessionUsage()` (tokens spent, counted live), `agent.listLearnedSkills()`, `agent.capabilities` |
+| `forgetSkill(name)` | delete one of the agent's own lessons from its notebook |
+| `sendUndelivered()` / `discardUndelivered()` | send, or drop, what a stopped run never showed the agent |
 | `send(text)`, `stopSubagent(id)` | Say something to the running agent (shown to the model at its next boundary; the replanner re-checks the plan) / stop one subagent. `queued`, `notes` and `undelivered` show where a message is — see [docs/chat.md](docs/chat.md#talking-to-the-agent-while-it-works) |
 | `reset()` | Clear the whole conversation (and the agent's memory of it) |
 | `reload()` | Rebuild the agent (e.g. after storing a new key) |
@@ -187,6 +195,9 @@ function Custom() {
 | `compact()` | summarise the stored transcript now |
 | `sessionId` / `loadChat(chat)` | the memory session; switch conversations |
 | `subagents`, `skills`, `discoveredTools`, `compactions`, `budget` | the rest of the run, folded |
+| `learned`, `learnedNow`, `fetches` | the agent's notebook (`LessonView[]`, survives `reset`), what it wrote this run, and the `web_fetch` requests this run made (`FetchView[]`) |
+| `queued`, `notes`, `undelivered`, `replan` | steering: messages waiting, shown (and where), left over; the last replan decision (`byUser` when a message caused it) |
+| `error`, `stopped`, `events`, `seq` | the run's error text, whether it was stopped, the raw event log and its counter |
 | `modelLoad` | WebLLM download progress, when loading |
 
 **Options:** `deps` (rebuild the agent when these change — e.g. on a model
@@ -443,6 +454,14 @@ import { agentStateReducer, createInitialAgentState } from '@dudko.dev/agent-web
 let state = createInitialAgentState()
 state = agentStateReducer(state, { type: 'event', event }) // fold each AgentEvent
 ```
+
+The state is made of plain, exported view types you can render with your own components:
+`StepView` (a step and its `ToolCallView`s), `ApprovalView`, `SubagentView`, `UserNoteView` /
+`QueuedMessageView` (steering), `LessonView` / `FetchView` (the notebook and the pages fetched),
+`BudgetView`, `CompactionView`, `AttachmentView`, `ChatMessage` (a transcript entry that keeps its
+own steps, usage and duration). Outside `<AgentChat>`, `useAgentContext()` returns the controller of
+the enclosing `<AgentProvider>` (it throws outside one; `useOptionalAgentContext()` returns
+`undefined` instead), and `useLabels()` the labels in effect.
 
 ## How it fits together
 
