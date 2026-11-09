@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -461,4 +462,10 @@ test('MessageList: the turn says what the agent learned and what it fetched - an
     createElement(MessageList, { messages: [m], activityOpen: true, showLearned: false }),
   )
   assert.doesNotMatch(hidden, /learned:|web request|awr-fetch/)
+})
+
+test('docs/chat.md lists every label key (a new label must be documented)', () => {
+  const doc = readFileSync(new URL('../docs/chat.md', import.meta.url), 'utf8')
+  const missing = Object.keys(defaultLabels).filter((k) => !doc.includes(`\`${k}\``))
+  assert.deepEqual(missing, [], `label keys missing from docs/chat.md: ${missing.join(', ')}`)
 })

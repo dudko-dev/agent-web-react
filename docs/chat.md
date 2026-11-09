@@ -49,12 +49,15 @@ function Assistant() {
 
 - [Transcript](#transcript)
 - [Composer](#composer)
+- [Talking to the agent while it works](#talking-to-the-agent-while-it-works)
+- [The agent's notebook, and what it fetched](#the-agents-notebook-and-what-it-fetched)
 - [Attachments: images, PDFs, files, URLs](#attachments-images-pdfs-files-urls)
 - [Saved chats (IndexedDB)](#saved-chats-indexeddb)
 - [Workspace (virtual file system)](#workspace-virtual-file-system)
 - [Tool consent](#tool-consent)
 - [Customising: show/hide, labels, render props, slots, components, theme](#customising)
 - [Hooks and helpers for your own UI](#hooks-and-helpers-for-your-own-ui)
+- [Label reference](#label-reference)
 
 ## Transcript
 
@@ -84,6 +87,10 @@ full size) and file chips. The header shows the conversation's total.
 | `showStatus` | `true` | the status dot in the header |
 | `showContext` | `false` | context meter above the composer (`number` = budget bar) |
 | `activityOpen` | `false` | keep finished answers' activity expanded |
+| `emptyState` | `labels.emptyState` | what the transcript shows before the first message (any node) |
+| `defaultHistoryOpen` | wide panel: yes · narrow: no | whether the saved-chats sidebar starts open |
+| `defaultFilesOpen` | `false` | whether the Files panel starts open |
+| `narrowWidth` | `760` | below this width (px) the side panels overlay the chat |
 
 ## Composer
 
@@ -113,6 +120,7 @@ full size) and file chips. The header shows the conversation's total.
 | `steering` / `showQueued` | typing to the agent while it works; the queue strips ([below](#talking-to-the-agent-while-it-works)) |
 | `showTimer` / `showAgents` / `showApprovalMode` / `showNotices` | toolbar parts |
 | `toolbarExtra` / `toolbarEnd` | your own toolbar content |
+| `compactWidth` | below this width (px) the toolbar chips show icons and numbers only (default 460) |
 | `renderAttachment` | render a pending attachment chip yourself |
 | `labels`, `placeholder`, `disabled`, `className` | |
 
@@ -238,6 +246,9 @@ chats.remove(id)
 
 Chats are saved when a run settles, not on every streamed token.
 
+`<ChatHistoryList>` (the sidebar, usable on its own) also takes `renderChat(chat, active, fallback)`
+to draw a row yourself and `formatTime(ms)` for the timestamps.
+
 ## Workspace (virtual file system)
 
 `files` takes the core's `VirtualFileSystem` (IndexedDB, browser only — in Node
@@ -248,12 +259,21 @@ download, delete, upload), and `createFileTools(files)` gives the agent
 files — so "summarise the PDF I attached and save the summary next to it"
 works.
 
+`<FilesPanel>` (usable on its own) props: `allowUpload` / `allowDelete` (both default true),
+`uploadDir` (where uploads go, default `/uploads`), `onOpen(file)` (a row was clicked, in addition to
+the preview) and `renderFile(file, fallback)` to draw a row yourself.
+
 ## Tool consent
 
 With a `toolApproval` mode other than autopilot, consent requests appear as
 cards in the transcript ("Allow once", "Always allow", "Deny"); the consent
 chip in the composer and the `/autopilot`, `/ask`, `/ask-all`, `/read-only`
 commands switch the mode live, even mid-run.
+
+`<ToolApprovalPrompt>` (usable on its own) takes `approvals` (e.g. `useAgent().pendingApprovals`), `onApprove(id, { remember })` and
+`onDeny(id, reason)` (wire them to `useAgent().approve` / `.deny`), and `allowRemember` (default
+true; false hides "Always allow"). `<ContextMeter>` shows tokens against `budgetTokens` and, with
+`onCompact` (e.g. `agent.compact`), a "Compact" button — `compacting` disables it while it runs.
 
 ## Customising
 
@@ -309,5 +329,35 @@ tokens inside an element with class `awr-theme`.
 | `useSpeechToText` | Web Speech API: `{ supported, listening, interim, start, stop, toggle }` |
 | `useMcpServers` | several MCP servers, merged tools — import from `@dudko.dev/agent-web-react/mcp` |
 | `agentStateReducer` | the pure event → UI reducer |
+| `useAgentContext` / `useOptionalAgentContext` | the controller of the enclosing `<AgentProvider>` (the first throws outside one, the second returns `undefined`) |
+| `useLabels` / `mergeLabels` / `defaultLabels` | the labels in effect, merged over a base, and the English defaults ([below](#label-reference)) |
 | `parseSlash`, `filterCommands`, `attachmentKindOf`, `withAttachments`, `attachmentRefusal`, `noticesOf`, `formatElapsed`, `usageLine` | the composer's and transcript's pure logic |
 | `downscaleImage` | the image downscaler |
+
+## Label reference
+
+Every string the components show is a key of `AgentLabels`. Pass a partial object as `labels` (to a
+component or `<AgentLabelsProvider>`); whatever you leave out falls back to `defaultLabels`. Keys marked
+*(fn)* are functions, so plurals work in any language; *(map)* keys are objects keyed by something.
+
+- **Frame and transcript:** `emptyState`, `status` *(map by status)*, `history`, `newChat`, `files`,
+  `totalUsage`, `showHistory`, `showFiles`, `close`, `steps` *(fn: n)*, `toolCalls` *(fn: n)*,
+  `subagents` *(fn: n)*, `skillsUsed` *(fn: names)*, `answerThoughts`, `stepThoughts`, `usageTitle`,
+  `attachments`, `planned`, `replanned` *(fn: mode, reason)*, `failed`, `toolCostTitle`.
+- **Notebook and fetches:** `learnedNow` *(fn: names)*, `fetches` *(fn: n)*, `fetchRefused` *(fn: reason)*,
+  `notebookTitle`, `notebookEmpty`, `notebookForget`, `notebookRevision` *(fn: n)*, `notebookFrom`.
+- **Composer:** `placeholder`, `listening`, `message`, `dropHint`, `attach`, `attachTitle`, `commands`,
+  `commandsTitle`, `send`, `stop`, `dismiss`, `remove` *(fn: name)*, `dictate`, `dictateTitle`,
+  `stopDictation`, `microphone`, `model`, `thinking`, `toolConsent`, `modes` *(map by approval mode:
+  `{ label, hint }`)*, `timerRunning`, `timerLast`, `agents` *(fn: n)*, `agentsTitle`, `notices` *(map
+  of notice texts)*, `attachmentsOnly`, `seeAttachments`, `tooLarge` *(fn: name, mb)*, `binaryText`
+  *(fn: name)*, `commandGroups` *(map)*, `commandDescriptions` *(map)*, `thinkingLevels` *(map)*.
+- **Steering:** `placeholderBusy`, `steer`, `noAttachmentsWhileBusy`, `queuedWaiting`, `noteAt` *(map by
+  `round` / `step` / `final`)*, `undelivered` *(fn: n)*, `sendUndelivered`, `discardUndelivered`,
+  `stopSubagent`, `subagentStopped`.
+- **Files and saved chats:** `filesEmpty`, `upload`, `download`, `delete`, `preview`, `bytes` *(fn: n)*,
+  `historyEmpty`, `deleteChat`, `messagesCount` *(fn: n)*.
+- **Consent:** `approvalLead`, `approve`, `alwaysAllow`, `deny`, `declinedReason`, `readOnlyTool`,
+  `consentWaiting`, `consentAllowed`, `consentDenied` *(fn: reason?)*.
+
+`tests/chat.test.ts` fails if a key is added to `AgentLabels` and not listed here.
