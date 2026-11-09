@@ -63,7 +63,7 @@ export { AgentProvider, useAgentContext, useOptionalAgentContext } from './conte
 export type { AgentProviderProps } from './context.js'
 
 // ── Headless state (the pure event → UI reducer, for custom UIs) ─────────────
-export { agentStateReducer, createInitialAgentState } from './state.js'
+export { agentStateReducer, createInitialAgentState, lessonsOf } from './state.js'
 export type { AgentAction } from './state.js'
 export type {
   AgentUiState,
@@ -75,6 +75,8 @@ export type {
   ChatAttachment,
   ChatMessage,
   CompactionView,
+  FetchView,
+  LessonView,
   StepView,
   SubagentView,
   ToolCallView,
@@ -101,6 +103,8 @@ export { MessageList, AttachmentView, usageLine } from './components/MessageList
 export type { MessageListProps } from './components/MessageList.js'
 export { ChatHistoryList } from './components/ChatHistoryList.js'
 export type { ChatHistoryListProps } from './components/ChatHistoryList.js'
+export { LearnedSkills } from './components/LearnedSkills.js'
+export type { LearnedSkillsProps } from './components/LearnedSkills.js'
 export { FilesPanel } from './components/FilesPanel.js'
 export type { FilesPanelProps } from './components/FilesPanel.js'
 export { Composer } from './components/Composer.js'
