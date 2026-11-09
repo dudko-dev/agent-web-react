@@ -178,7 +178,7 @@ function Custom() {
 | --- | --- |
 | `run(goal, { images, files, attachments, label })` | Start a run (with attachments); resolves with the `RunResult` |
 | `stop()` | Abort the in-flight run |
-| `agent` | the core `Agent` itself (or `undefined` until built): `agent.usage` / `agent.sessionUsage()` (tokens spent, counted live), `agent.listLearnedSkills()`, `agent.capabilities` |
+| `agent` | the core `Agent` itself (or `undefined` until built): `agent.usage` / `agent.sessionUsage()` (tokens spent, counted live; core ≥ 0.0.32), `agent.listLearnedSkills()`, `agent.capabilities` |
 | `forgetSkill(name)` | delete one of the agent's own lessons from its notebook |
 | `sendUndelivered()` / `discardUndelivered()` | send, or drop, what a stopped run never showed the agent |
 | `send(text)`, `stopSubagent(id)` | Say something to the running agent (shown to the model at its next boundary; the replanner re-checks the plan) / stop one subagent. `queued`, `notes` and `undelivered` show where a message is — see [docs/chat.md](docs/chat.md#talking-to-the-agent-while-it-works) |
@@ -397,9 +397,11 @@ Two notes:
   core — importing these hooks is what puts it in your build.
 - `oauthSupported` is `false` on cores older than `@dudko.dev/agent-web@0.0.9`,
   which introduced `BrowserOAuthProvider`; header auth still works there. The
-  peer floor is `>=0.0.20` — the first core with the virtual file system,
-  attachments, consent, tool search, subagents and context editing this
-  package's chat builds on.
+  peer floor is `>=0.0.30` — the first core with the learning notebook
+  (`forgetSkill`, `listLearnedSkills`) on top of the virtual file system,
+  attachments, consent, tool search, subagents, steering and context editing this
+  package's chat builds on. `agent.usage` / `agent.sessionUsage()` and the
+  window-derived output caps need `>=0.0.32`.
 
 ## Several MCP servers — `useMcpServers`
 
