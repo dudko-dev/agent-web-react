@@ -1,3 +1,8 @@
+# 0.0.24 / 2026-11-14
+
+### :tada: Enhancements
+- Updated dependencies: @playwright/test, prettier
+
 # 0.0.18 / 2026-11-07
 
 ### :tada: Enhancements
