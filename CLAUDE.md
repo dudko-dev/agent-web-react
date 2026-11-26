@@ -1,5 +1,8 @@
 # @dudko.dev/agent-web-react — instructions for Claude
 
+> **Moved.** This package now lives in the `dudko-dev/agents` monorepo (`packages/agent-web-react`). Do not make
+> changes here; this repository is read-only history.
+
 React bindings for **`@dudko.dev/agent-web`**, the headless in-browser LLM agent.
 This package adds a thin, UI layer: one hook (`useAgent`), a context provider,
 and a set of optional pre-styled components. It ships **no agent logic of its

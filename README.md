@@ -1,5 +1,12 @@
 # @dudko.dev/agent-web-react
 
+> [!IMPORTANT]
+> **This repository has moved.** `@dudko.dev/agent-web-react` is now developed in the
+> [`dudko-dev/agents`](https://github.com/dudko-dev/agents) monorepo, under
+> [`packages/agent-web-react`](https://github.com/dudko-dev/agents/tree/main/packages/agent-web-react). Issues, pull
+> requests and releases happen there; the npm package name is unchanged. Site and live demo:
+> [agent.dudko.dev](https://agent.dudko.dev). This repository is kept read-only for its history.
+
 React bindings for [`@dudko.dev/agent-web`](https://www.npmjs.com/package/@dudko.dev/agent-web) —
 the headless, universal **in-browser LLM agent**. Drop the agent into any React
 app with a single hook and (optionally) a set of pre-styled components:
